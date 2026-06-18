@@ -1,0 +1,77 @@
+# ──────────────────────────────────────────────────────────────────────────
+# MedicineReminder — .gitignore (Xcode + Swift Package Manager + XcodeGen)
+# ──────────────────────────────────────────────────────────────────────────
+
+# macOS Finder cruft
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# ──────────────────────────────────────────────────────────────────────────
+# XcodeGen — the project is generated from project.yml, never commit it
+# ──────────────────────────────────────────────────────────────────────────
+*.xcodeproj/
+*.xcworkspace/
+!default.xcworkspace
+.xcodegen/
+
+# ──────────────────────────────────────────────────────────────────────────
+# Xcode build artifacts & user data
+# ──────────────────────────────────────────────────────────────────────────
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Per-user Xcode state (schemes/breakpoints/window layout)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Generated schemes are kept by users locally
+**/xcshareddata/WorkspaceSettings.xcsettings
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# ──────────────────────────────────────────────────────────────────────────
+# Swift Package Manager
+# ──────────────────────────────────────────────────────────────────────────
+.build/
+.swiftpm/
+Packages/
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+
+# ──────────────────────────────────────────────────────────────────────────
+# CocoaPods / Carthage (not used here, but ignored for safety)
+# ──────────────────────────────────────────────────────────────────────────
+Pods/
+Carthage/Build/
+
+# ──────────────────────────────────────────────────────────────────────────
+# Fastlane / provisioning / signing secrets
+# ──────────────────────────────────────────────────────────────────────────
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+*.mobileprovision
+*.p12
+*.cer
+
+# ──────────────────────────────────────────────────────────────────────────
+# Misc
+# ──────────────────────────────────────────────────────────────────────────
+*.log
+*.swp
+*~
+.idea/
+.vscode/

@@ -1,0 +1,84 @@
+name: MedicineReminder
+
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  generateEmptyDirectories: true
+  xcodeVersion: "26.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""            # <-- set your Apple Developer Team ID
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad (iPadOS 26)
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+
+targets:
+  MedicineReminder:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: MedicineReminder
+      - path: Shared
+    dependencies:
+      - target: MedicineReminderWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.medicinereminder
+        PRODUCT_NAME: MedicineReminder
+        INFOPLIST_KEY_CFBundleDisplayName: MedicineReminder
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        ENABLE_PREVIEWS: YES
+        ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: YES
+    info:
+      path: MedicineReminder/Info.plist
+      properties:
+        CFBundleDisplayName: MedicineReminder
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        ITSAppUsesNonExemptEncryption: false
+        NSUserNotificationsUsageDescription: "MedicineReminder uses notifications to remind you when it's time to take your medicine."
+        UIBackgroundModes:
+          - remote-notification
+    entitlements:
+      path: MedicineReminder/MedicineReminder.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.example.medicinereminder
+
+  MedicineReminderWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: MedicineReminderWidgets
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.medicinereminder.widgets
+        PRODUCT_NAME: MedicineReminderWidgets
+        ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
+    info:
+      path: MedicineReminderWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Medicine Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: MedicineReminderWidgets/MedicineReminderWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.example.medicinereminder

@@ -1,0 +1,12 @@
+# Normalize line endings to LF so files authored on Windows build cleanly on macOS.
+* text=auto eol=lf
+*.swift   text eol=lf
+*.yml     text eol=lf
+*.md      text eol=lf
+*.plist   text eol=lf
+*.json    text eol=lf
+
+# Treat common binaries as binary.
+*.png binary
+*.jpg binary
+*.pdf binary
