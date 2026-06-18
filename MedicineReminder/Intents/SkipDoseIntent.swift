@@ -2,7 +2,6 @@ import AppIntents
 import Foundation
 
 /// "Skip my Aspirin" — marks the next scheduled dose of a medicine as skipped.
-@MainActor
 struct SkipDoseIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Skip Dose"
@@ -26,6 +25,7 @@ struct SkipDoseIntent: AppIntent {
         Summary("Skip \(\.$medicine)")
     }
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = try IntentSupport.medicine(for: medicine)
         let name = model.name

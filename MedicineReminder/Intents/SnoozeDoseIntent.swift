@@ -3,7 +3,6 @@ import Foundation
 
 /// "Snooze my Aspirin" — snoozes the next scheduled dose of a medicine by the
 /// app's default snooze interval so it nudges you again shortly.
-@MainActor
 struct SnoozeDoseIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Snooze Dose"
@@ -27,6 +26,7 @@ struct SnoozeDoseIntent: AppIntent {
         Summary("Snooze \(\.$medicine)")
     }
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = try IntentSupport.medicine(for: medicine)
         let name = model.name

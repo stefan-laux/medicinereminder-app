@@ -2,7 +2,6 @@ import AppIntents
 import Foundation
 
 /// "What's my streak?" — speaks the current adherence streak.
-@MainActor
 struct CheckStreakIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Check Streak"
@@ -15,6 +14,7 @@ struct CheckStreakIntent: AppIntent {
 
     static let openAppWhenRun = false
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let medicines = try IntentSupport.activeMedicines()
         let logs = try IntentSupport.allLogs()

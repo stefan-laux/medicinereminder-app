@@ -3,7 +3,6 @@ import Foundation
 
 /// "Log 2 tablets of Aspirin" — logs a dose as taken with a quantity override
 /// that differs from the medicine's default dosage amount.
-@MainActor
 struct LogDoseWithAmountIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Log Dose with Amount"
@@ -34,6 +33,7 @@ struct LogDoseWithAmountIntent: AppIntent {
         Summary("Log \(\.$amount) of \(\.$medicine)")
     }
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = try IntentSupport.medicine(for: medicine)
         let name = model.name

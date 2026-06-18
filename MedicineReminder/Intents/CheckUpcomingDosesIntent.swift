@@ -3,7 +3,6 @@ import Foundation
 
 /// "What medicine do I still need to take today?" — speaks the list of doses
 /// still pending for the rest of today.
-@MainActor
 struct CheckUpcomingDosesIntent: AppIntent {
 
     static let title: LocalizedStringResource = "Check Upcoming Doses"
@@ -16,6 +15,7 @@ struct CheckUpcomingDosesIntent: AppIntent {
 
     static let openAppWhenRun = false
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let medicines = try IntentSupport.activeMedicines()
         let logs = try IntentSupport.allLogs()

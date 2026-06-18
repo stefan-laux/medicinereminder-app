@@ -6,7 +6,6 @@ import Foundation
 /// Logs the medicine's next scheduled dose (or an ad-hoc dose if nothing is
 /// scheduled) as taken, right now. Conforms to `PredictableIntent` so the system
 /// can proactively surface it around dose times.
-@MainActor
 struct LogDoseTakenIntent: AppIntent, PredictableIntent {
 
     static let title: LocalizedStringResource = "Log Dose as Taken"
@@ -44,6 +43,7 @@ struct LogDoseTakenIntent: AppIntent, PredictableIntent {
 
     // MARK: Perform
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let model = try IntentSupport.medicine(for: medicine)
         let dosage = model.dosageDescription
