@@ -25,7 +25,7 @@ struct MedicineReminderShortcuts: AppShortcutsProvider {
             intent: LogDoseWithAmountIntent(),
             phrases: [
                 "Log an amount in \(.applicationName)",
-                "Log \(\.$amount) of \(\.$medicine) in \(.applicationName)",
+                "Log a dose of \(\.$medicine) in \(.applicationName)",
                 "Log a custom dose in \(.applicationName)"
             ],
             shortTitle: "Log Amount",
