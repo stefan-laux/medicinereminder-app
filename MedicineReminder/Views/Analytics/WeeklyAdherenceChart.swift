@@ -136,7 +136,7 @@ private struct WeeklyChartPreview: View {
             let taken = [3, 2, 3, 1, 3, 3, 2][offset % 7]
             return DailyAdherence(day: day, stat: AdherenceStat(taken: taken, scheduled: scheduled))
         }
-        return WeeklyAdherenceChart(days: sample)
+        WeeklyAdherenceChart(days: sample)
             .padding()
             .background(Color(.systemGroupedBackground))
     }

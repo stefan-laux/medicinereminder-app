@@ -43,7 +43,7 @@ public struct PlansView: View {
         // Compute the marker buckets once per render and share across sections.
         let plan = self.plan
 
-        return NavigationStack {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.xl) {
                     WeekStripView(

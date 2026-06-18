@@ -177,7 +177,7 @@ private struct HeatmapPreview: View {
             let taken = scheduled == 0 ? 0 : max(0, scheduled - (offset % 4))
             return DailyAdherence(day: day, stat: AdherenceStat(taken: taken, scheduled: scheduled))
         }
-        return MonthlyHeatmapSection(days: sample, calendar: calendar)
+        MonthlyHeatmapSection(days: sample, calendar: calendar)
             .padding()
             .background(Color(.systemGroupedBackground))
     }
