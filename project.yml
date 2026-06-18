@@ -47,6 +47,9 @@ targets:
       path: MedicineReminder/Info.plist
       properties:
         CFBundleDisplayName: MedicineReminder
+        # An (empty) launch screen is REQUIRED for the app to use the full native
+        # screen size — without it iOS renders the app letterboxed/scaled.
+        UILaunchScreen: {}
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         ITSAppUsesNonExemptEncryption: false
