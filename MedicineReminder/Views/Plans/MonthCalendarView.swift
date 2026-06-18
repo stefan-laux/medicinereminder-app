@@ -154,7 +154,7 @@ struct MonthCalendarView: View {
     let gridStart = PlanCalendar.startOfWeek(for: monthStart, calendar: calendar)
     let range = gridStart...(calendar.date(byAdding: .day, value: 41, to: gridStart) ?? monthStart)
 
-    return MonthCalendarPreviewHost(
+    MonthCalendarPreviewHost(
         manager: manager,
         plan: PlanData(medicines: manager.medicines, logs: [], range: range, calendar: calendar),
         calendar: calendar

@@ -54,7 +54,7 @@ public struct ColorChip: View {
 
 #Preview("ColorChip") {
     let columns = [GridItem(.adaptive(minimum: 44), spacing: Spacing.md)]
-    return ScrollView {
+    ScrollView {
         LazyVGrid(columns: columns, spacing: Spacing.md) {
             ForEach(MedicineColor.allCases) { c in
                 ColorChip(color: c, isSelected: c == .blue)

@@ -120,7 +120,7 @@ private struct MiniBar: View {
         MedicineAdherenceRow(id: UUID(), name: "Vitamin D3", colorRaw: MedicineColor.amber.rawValue,
                              iconName: "sun.max.fill", stat: AdherenceStat(taken: 6, scheduled: 13))
     ]
-    return PerMedicineAdherenceList(rows: rows)
+    PerMedicineAdherenceList(rows: rows)
         .padding()
         .background(Color(.systemGroupedBackground))
 }

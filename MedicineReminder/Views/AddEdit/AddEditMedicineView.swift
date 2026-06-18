@@ -852,7 +852,7 @@ public struct AddEditMedicineView: View {
 #if DEBUG
 #Preview("Add Medicine") {
     let container = SharedModelContainer.preview()
-    return AddEditMedicineView()
+    AddEditMedicineView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }
@@ -860,7 +860,7 @@ public struct AddEditMedicineView: View {
 #Preview("Edit Medicine") {
     let container = SharedModelContainer.preview()
     let medicine = (try? container.mainContext.fetch(FetchDescriptor<Medicine>()))?.first
-    return Group {
+    Group {
         if let medicine {
             AddEditMedicineView(medicine: medicine)
         } else {

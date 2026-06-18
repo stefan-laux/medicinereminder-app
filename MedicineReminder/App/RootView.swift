@@ -28,7 +28,7 @@ struct RootView: View {
 #if DEBUG
 #Preview {
     let container = SharedModelContainer.preview()
-    return RootView()
+    RootView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }

@@ -88,7 +88,7 @@ struct DayDetailView: View {
     let container = SharedModelContainer.preview()
     let manager = DoseManager(context: container.mainContext)
 
-    return ScrollView {
+    ScrollView {
         DayDetailView(
             day: Date(),
             events: manager.todaysEvents,
@@ -104,7 +104,7 @@ struct DayDetailView: View {
     let container = SharedModelContainer.preview()
     let manager = DoseManager(context: container.mainContext)
 
-    return ScrollView {
+    ScrollView {
         DayDetailView(
             day: Date(),
             events: [],

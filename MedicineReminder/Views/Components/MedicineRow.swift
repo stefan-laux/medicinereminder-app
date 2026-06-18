@@ -84,7 +84,7 @@ import SwiftData
     let container = SharedModelContainer.preview()
     let medicines = (try? container.mainContext.fetch(FetchDescriptor<Medicine>())) ?? []
 
-    return List {
+    List {
         ForEach(medicines) { medicine in
             MedicineRow(medicine: medicine, showsChevron: true)
         }

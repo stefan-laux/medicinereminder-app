@@ -301,7 +301,7 @@ import SwiftData
 
 #Preview("Home — With Doses") {
     let container = SharedModelContainer.preview()
-    return HomeView()
+    HomeView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }
@@ -311,7 +311,7 @@ import SwiftData
     let config = ModelConfiguration(schema: SharedModelContainer.schema, isStoredInMemoryOnly: true)
     let container = (try? ModelContainer(for: SharedModelContainer.schema, configurations: config))
         ?? SharedModelContainer.preview()
-    return HomeView()
+    HomeView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }

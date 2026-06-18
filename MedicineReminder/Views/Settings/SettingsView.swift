@@ -392,7 +392,7 @@ fileprivate struct CSVDocument: Transferable {
 #if DEBUG
 #Preview {
     let container = SharedModelContainer.preview()
-    return SettingsView()
+    SettingsView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }

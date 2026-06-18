@@ -249,7 +249,7 @@ enum PlanCalendar {
 #if DEBUG
 #Preview("Plans") {
     let container = SharedModelContainer.preview()
-    return PlansView()
+    PlansView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }

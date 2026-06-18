@@ -375,7 +375,7 @@ import SwiftData
     let container = SharedModelContainer.preview()
     let manager = DoseManager(context: container.mainContext)
 
-    return ScrollView {
+    ScrollView {
         VStack(spacing: Spacing.lg) {
             ForEach(manager.todaysEvents) { event in
                 DoseEventCard(event: event, manager: manager)

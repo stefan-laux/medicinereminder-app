@@ -198,7 +198,7 @@ struct WeekStripView: View {
     let range = (calendar.date(byAdding: .day, value: -7, to: today) ?? today)
         ...(calendar.date(byAdding: .day, value: 7, to: today) ?? today)
 
-    return StatefulPreviewWrapper(today) { selection in
+    StatefulPreviewWrapper(today) { selection in
         WeekStripView(
             selectedDay: selection,
             plan: PlanData(medicines: manager.medicines, logs: [], range: range, calendar: calendar),

@@ -56,7 +56,7 @@ private enum AppTab: String, Hashable {
 #if DEBUG
 #Preview {
     let container = SharedModelContainer.preview()
-    return MainTabView()
+    MainTabView()
         .modelContainer(container)
         .environment(DoseManager(context: container.mainContext))
 }

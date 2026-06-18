@@ -95,7 +95,7 @@ struct CalendarDayCell: View {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
 
-    return HStack(spacing: Spacing.md) {
+    HStack(spacing: Spacing.md) {
         CalendarDayCell(
             day: today,
             isInMonth: true,
