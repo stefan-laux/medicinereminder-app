@@ -47,14 +47,10 @@ public final class LiveActivityService {
             title: title
         )
         let state = Self.contentState(from: event)
-        let content = ActivityContent(state: state, staleDate: event.time.addingTimeInterval(window))
+        let staleDate = event.time.addingTimeInterval(window)
 
         do {
-            let activity = try Activity.request(
-                attributes: attributes,
-                content: content,
-                pushType: nil
-            )
+            let activity = try Self.requestActivity(attributes: attributes, state: state, staleDate: staleDate)
             activities[event.id] = activity
             scheduleAutoDismiss(for: event)
         } catch {
@@ -66,8 +62,7 @@ public final class LiveActivityService {
     public func update(for event: DoseEvent) async {
         guard let activity = activity(for: event.id) else { return }
         let state = Self.contentState(from: event)
-        let content = ActivityContent(state: state, staleDate: event.time.addingTimeInterval(window))
-        await activity.update(content)
+        await Self.pushUpdate(to: activity, state: state, staleDate: event.time.addingTimeInterval(window))
 
         // Once every item is resolved (nothing pending), retire the activity.
         if state.takenCount + skippedCount(in: event) >= state.totalCount, state.totalCount > 0 {
@@ -133,6 +128,29 @@ public final class LiveActivityService {
     private func cancelAutoDismiss(for eventID: String) {
         dismissTasks[eventID]?.cancel()
         dismissTasks[eventID] = nil
+    }
+
+    // MARK: ActivityKit requests (nonisolated)
+
+    /// Create and consume the non-Sendable `ActivityContent` entirely off the
+    /// main actor so it never crosses an isolation boundary (Swift 6 region
+    /// isolation). Inputs and the returned `Activity` handle are all Sendable.
+    private nonisolated static func requestActivity(
+        attributes: DoseActivityAttributes,
+        state: DoseActivityAttributes.ContentState,
+        staleDate: Date
+    ) throws -> Activity<DoseActivityAttributes> {
+        let content = ActivityContent(state: state, staleDate: staleDate)
+        return try Activity.request(attributes: attributes, content: content, pushType: nil)
+    }
+
+    private nonisolated static func pushUpdate(
+        to activity: Activity<DoseActivityAttributes>,
+        state: DoseActivityAttributes.ContentState,
+        staleDate: Date
+    ) async {
+        let content = ActivityContent(state: state, staleDate: staleDate)
+        await activity.update(content)
     }
 
     // MARK: Mapping
