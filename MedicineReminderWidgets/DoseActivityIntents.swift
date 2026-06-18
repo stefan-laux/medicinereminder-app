@@ -22,10 +22,10 @@ import WidgetKit
 /// Marks a specific medicine's dose at a given slot as taken from the Live
 /// Activity / widget.
 struct TakeDoseIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Take Dose"
-    static var description = IntentDescription("Marks a scheduled dose as taken.")
+    static let title: LocalizedStringResource = "Take Dose"
+    static let description = IntentDescription("Marks a scheduled dose as taken.")
     /// Run in-app/in-extension so the action is immediate; don't open the app.
-    static var openAppWhenRun: Bool = false
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Medicine ID")
     var medicineID: String
@@ -57,9 +57,9 @@ struct TakeDoseIntent: LiveActivityIntent {
 
 /// Marks a specific medicine's dose at a given slot as skipped.
 struct SkipDoseIntent: LiveActivityIntent {
-    static var title: LocalizedStringResource = "Skip Dose"
-    static var description = IntentDescription("Marks a scheduled dose as skipped.")
-    static var openAppWhenRun: Bool = false
+    static let title: LocalizedStringResource = "Skip Dose"
+    static let description = IntentDescription("Marks a scheduled dose as skipped.")
+    static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Medicine ID")
     var medicineID: String

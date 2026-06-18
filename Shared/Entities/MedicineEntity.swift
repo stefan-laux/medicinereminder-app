@@ -4,8 +4,8 @@ import SwiftData
 
 // MedicineEntity.swift
 public struct MedicineEntity: AppEntity, Identifiable {
-    public static var typeDisplayRepresentation: TypeDisplayRepresentation = "Medicine"
-    public static var defaultQuery = MedicineEntityQuery()
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Medicine"
+    public static let defaultQuery = MedicineEntityQuery()
 
     public var id: UUID
     public var name: String
