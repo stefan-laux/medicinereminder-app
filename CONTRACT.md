@@ -10,9 +10,9 @@
 - Swift 6 language mode, strict concurrency. Prefer `Sendable`, `@MainActor` where stated.
 - Built on macOS with Xcode 26 via XcodeGen (`project.yml` at repo root). Nothing compiles on the authoring machine (Windows) — write code that is *inspection-correct*.
 - **Bundle IDs (placeholders — user replaces prefix/team):**
-  - App: `com.example.medicinereminder`
-  - Widget extension: `com.example.medicinereminder.widgets`
-  - **App Group: `group.com.example.medicinereminder`** (shared SwiftData store).
+  - App: `com.stefanlaux.medicinereminder`
+  - Widget extension: `com.stefanlaux.medicinereminder.widgets`
+  - **App Group: `group.com.stefanlaux.medicinereminder`** (shared SwiftData store).
 - Two targets only:
   1. `MedicineReminder` (application) — sources: `MedicineReminder/` + `Shared/`.
   2. `MedicineReminderWidgets` (app-extension, WidgetBundle = widgets **and** Live Activity) — sources: `MedicineReminderWidgets/` + `Shared/`.
@@ -259,7 +259,7 @@ public final class DoseLog {
 ```swift
 // AppGroup.swift
 public enum AppGroup {
-    public static let identifier = "group.com.example.medicinereminder"
+    public static let identifier = "group.com.stefanlaux.medicinereminder"
 }
 
 // SharedModelContainer.swift

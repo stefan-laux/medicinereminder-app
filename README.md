@@ -49,13 +49,13 @@ first build requires a generation step.
    `MedicineReminder` app target and the `MedicineReminderWidgets` extension target:
 
    - Set **`DEVELOPMENT_TEAM`** to your Apple Developer Team ID (it ships blank).
-   - Replace the placeholder **bundle id prefix `com.example`** with your own reverse-DNS
-     prefix. The identifiers to update are:
-     - App: `com.example.medicinereminder`
-     - Widgets: `com.example.medicinereminder.widgets`
-   - Replace the placeholder **App Group `group.com.example.medicinereminder`** with your
-     own (it is referenced in `Shared/Persistence/AppGroup.swift`, the two `.entitlements`
-     files, and `project.yml` — keep them all in sync).
+   - The identifiers are preset to:
+     - App: `com.stefanlaux.medicinereminder`
+     - Widgets: `com.stefanlaux.medicinereminder.widgets`
+     - App Group: `group.com.stefanlaux.medicinereminder`
+   - If you need a different reverse-DNS namespace, change them together in `project.yml`
+     and `Shared/Persistence/AppGroup.swift` (re-run `xcodegen generate` after editing
+     `project.yml`; the `.entitlements` files are regenerated from it).
 
 5. **Enable capabilities** under *Signing & Capabilities* for **both** targets:
 
@@ -168,9 +168,10 @@ and is App Store-submittable you should plan for the following:
   you generate it.
 - **Signing is not configured.** `DEVELOPMENT_TEAM` is blank and signing must be set per
   target. Without a team, device builds and capabilities will not provision.
-- **Replace placeholder identifiers.** `com.example…` bundle ids and the
-  `group.com.example.medicinereminder` App Group are placeholders — change them in
-  `project.yml`, the entitlements files, and `Shared/Persistence/AppGroup.swift` together.
+- **Identifiers are preset to `com.stefanlaux.*`** with the
+  `group.com.stefanlaux.medicinereminder` App Group. To use a different namespace, change
+  them in `project.yml` and `Shared/Persistence/AppGroup.swift` together (entitlements are
+  regenerated from `project.yml`).
 - **Enable capabilities manually.** App Groups, Live Activities, and (if you add remote
   updates) Push Notifications must be toggled on in *Signing & Capabilities* for **both**
   targets; XcodeGen seeds the entitlements but the capability switches are an Xcode/portal

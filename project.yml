@@ -1,7 +1,7 @@
 name: MedicineReminder
 
 options:
-  bundleIdPrefix: com.example
+  bundleIdPrefix: com.stefanlaux
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -34,7 +34,7 @@ targets:
       - target: MedicineReminderWidgets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.medicinereminder
+        PRODUCT_BUNDLE_IDENTIFIER: com.stefanlaux.medicinereminder
         PRODUCT_NAME: MedicineReminder
         INFOPLIST_KEY_CFBundleDisplayName: MedicineReminder
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -57,7 +57,7 @@ targets:
       path: MedicineReminder/MedicineReminder.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.example.medicinereminder
+          - group.com.stefanlaux.medicinereminder
 
   MedicineReminderWidgets:
     type: app-extension
@@ -68,7 +68,7 @@ targets:
       - path: Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.medicinereminder.widgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.stefanlaux.medicinereminder.widgets
         PRODUCT_NAME: MedicineReminderWidgets
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: NO
     info:
@@ -81,4 +81,4 @@ targets:
       path: MedicineReminderWidgets/MedicineReminderWidgets.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.example.medicinereminder
+          - group.com.stefanlaux.medicinereminder
