@@ -195,8 +195,9 @@ struct WeekStripView: View {
     let manager = DoseManager(context: container.mainContext)
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: Date())
-    let range = (calendar.date(byAdding: .day, value: -7, to: today) ?? today)
-        ...(calendar.date(byAdding: .day, value: 7, to: today) ?? today)
+    let start = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+    let end = calendar.date(byAdding: .day, value: 7, to: today) ?? today
+    let range = start...end
 
     StatefulPreviewWrapper(today) { selection in
         WeekStripView(
