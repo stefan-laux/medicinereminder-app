@@ -14,7 +14,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-extension AppDelegate: UNUserNotificationCenterDelegate {
+extension AppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
 
     /// Show dose reminders as banners + sound even when the app is foregrounded.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
