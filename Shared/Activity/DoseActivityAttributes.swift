@@ -2,11 +2,11 @@ import ActivityKit
 import Foundation
 
 public struct DoseActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable {
+    public struct ContentState: Codable, Hashable, Sendable {
         public var medicines: [Item]
         public var takenCount: Int
         public var totalCount: Int
-        public struct Item: Codable, Hashable, Identifiable {
+        public struct Item: Codable, Hashable, Identifiable, Sendable {
             public var id: String          // medicineID uuid string
             public var name: String
             public var dosage: String
