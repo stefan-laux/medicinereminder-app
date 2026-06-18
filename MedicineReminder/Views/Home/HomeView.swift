@@ -33,24 +33,10 @@ public struct HomeView: View {
 
     public var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: Spacing.xl) {
-                    hero
-
-                    if manager.todaysEvents.isEmpty {
-                        emptyState
-                    } else {
-                        timeline
-                    }
-                }
-                .padding(.horizontal, Spacing.lg)
-                .padding(.top, Spacing.sm)
-                .padding(.bottom, Spacing.xxl)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .scrollContentBackground(.hidden)
-            .background(background)
-            .refreshable { manager.reload() }
+            mainScroll
+                .scrollContentBackground(.hidden)
+                .background(background)
+                .refreshable { manager.reload() }
             .navigationTitle("Today")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -74,6 +60,41 @@ public struct HomeView: View {
                 didAppear = true
             } else {
                 withAnimation(.smooth(duration: 0.5)) { didAppear = true }
+            }
+        }
+    }
+
+    // MARK: - Scrollable content
+
+    /// When there are no doses, the content is forced to the viewport height so
+    /// the empty state can sit centered (via the surrounding spacers); otherwise
+    /// it's a normal scrolling timeline that grows with its content.
+    @ViewBuilder
+    private var mainScroll: some View {
+        if manager.todaysEvents.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    hero
+                    Spacer(minLength: 0)
+                    emptyState
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.sm)
+                .padding(.bottom, Spacing.xxl)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .containerRelativeFrame(.vertical, alignment: .top)
+            }
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Spacing.xl) {
+                    hero
+                    timeline
+                }
+                .padding(.horizontal, Spacing.lg)
+                .padding(.top, Spacing.sm)
+                .padding(.bottom, Spacing.xxl)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -180,7 +201,6 @@ public struct HomeView: View {
             showingAdd = true
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, Spacing.xxl)
     }
 
     private var allDoneState: some View {
