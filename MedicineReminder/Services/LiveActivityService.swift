@@ -4,12 +4,13 @@ import Foundation
 /// Manages the Dynamic Island / Lock Screen Live Activity that tracks the
 /// progress of the current dose slot. Maps `DoseEvent` -> `DoseActivityAttributes`.
 ///
-/// `Activity` is not `Sendable`, so it is never cached in main-actor state.
-/// Each operation looks the activity up fresh from `Activity.activities`
-/// (a disconnected value used once and not retained), so the non-Sendable
-/// handle never crosses an isolation boundary while also being referenced by
-/// the service — which is what trips Swift 6 region isolation
-/// ("sending 'activity' risks causing data races").
+/// `Activity` is not `Sendable`. Calling its async `update`/`end` methods from a
+/// `@MainActor` context would *send* the non-Sendable handle across the actor
+/// boundary ("sending 'activity' risks causing data races"). So every ActivityKit
+/// call lives in a `nonisolated` helper that resolves the handle locally from
+/// `Activity.activities`, uses it, and discards it — the `Activity` is never
+/// passed between the main actor and nonisolated code. The `@MainActor` surface
+/// only ever moves `Sendable` values (ids, content state, dates).
 @MainActor
 public final class LiveActivityService {
 
@@ -20,48 +21,40 @@ public final class LiveActivityService {
     private var dismissTasks: [String: Task<Void, Never>] = [:]
 
     /// How long after the slot time an unacted activity is auto-dismissed.
-    /// Matches the `staleDate` used for the content state.
     private let window: TimeInterval = 2 * 60 * 60
 
     private init() {}
+
+    // MARK: Public surface (main actor)
 
     /// Start a Live Activity for the given dose event, or update it if one is
     /// already running for that slot. No-op if Live Activities are disabled.
     public func startOrUpdate(for event: DoseEvent, title: String) async {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-        // Already running for this slot -> push an update instead.
-        if currentActivity(for: event.id) != nil {
+        if Self.hasActivity(eventID: event.id) {
             await update(for: event)
             return
         }
 
-        let attributes = DoseActivityAttributes(
-            eventID: event.id,
-            slotTime: event.time,
-            title: title
-        )
-        let content = ActivityContent(
+        let attributes = DoseActivityAttributes(eventID: event.id, slotTime: event.time, title: title)
+        let started = Self.requestActivity(
+            attributes: attributes,
             state: Self.contentState(from: event),
             staleDate: event.time.addingTimeInterval(window)
         )
-
-        do {
-            // The returned handle is intentionally discarded; later operations
-            // re-resolve it from `Activity.activities`.
-            _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
-            scheduleAutoDismiss(for: event)
-        } catch {
-            // Starting a Live Activity can fail (budget, disabled). Fail quietly.
-        }
+        if started { scheduleAutoDismiss(for: event) }
     }
 
     /// Push an updated content state for the running activity of this slot.
     public func update(for event: DoseEvent) async {
-        guard let activity = currentActivity(for: event.id) else { return }
+        guard Self.hasActivity(eventID: event.id) else { return }
         let state = Self.contentState(from: event)
-        let content = ActivityContent(state: state, staleDate: event.time.addingTimeInterval(window))
-        await activity.update(content)
+        await Self.updateActivity(
+            eventID: event.id,
+            state: state,
+            staleDate: event.time.addingTimeInterval(window)
+        )
 
         // Once every item is resolved (nothing pending), retire the activity;
         // otherwise make sure an auto-dismiss is armed.
@@ -75,20 +68,66 @@ public final class LiveActivityService {
     /// End the activity for a specific slot immediately.
     public func end(eventID: String) async {
         cancelAutoDismiss(for: eventID)
-        guard let activity = currentActivity(for: eventID) else { return }
-        await activity.end(nil, dismissalPolicy: .immediate)
+        await Self.endActivityImmediately(eventID: eventID)
     }
 
     /// End every running dose activity (e.g. on data reset).
     public func endAll() async {
         for task in dismissTasks.values { task.cancel() }
         dismissTasks.removeAll()
+        await Self.endAllActivities()
+    }
 
-        // Resolve fresh handles one id at a time so no non-Sendable `Activity`
-        // is held across the `await`.
-        let ids = Activity<DoseActivityAttributes>.activities.map(\.attributes.eventID)
-        for id in ids {
-            guard let activity = currentActivity(for: id) else { continue }
+    // MARK: ActivityKit calls (nonisolated — the non-Sendable Activity never
+    // crosses an isolation boundary because it is resolved and used right here)
+
+    /// Whether the system currently has an activity for this slot id.
+    private nonisolated static func hasActivity(eventID: String) -> Bool {
+        Activity<DoseActivityAttributes>.activities.contains { $0.attributes.eventID == eventID }
+    }
+
+    /// Request a new activity. Returns whether it started.
+    private nonisolated static func requestActivity(
+        attributes: DoseActivityAttributes,
+        state: DoseActivityAttributes.ContentState,
+        staleDate: Date
+    ) -> Bool {
+        let content = ActivityContent(state: state, staleDate: staleDate)
+        do {
+            _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
+            return true
+        } catch {
+            // Starting a Live Activity can fail (budget, disabled). Fail quietly.
+            return false
+        }
+    }
+
+    /// Push new content to the activity for this slot, if one exists.
+    private nonisolated static func updateActivity(
+        eventID: String,
+        state: DoseActivityAttributes.ContentState,
+        staleDate: Date
+    ) async {
+        guard let activity = Activity<DoseActivityAttributes>.activities
+            .first(where: { $0.attributes.eventID == eventID }) else { return }
+        let content = ActivityContent(state: state, staleDate: staleDate)
+        await activity.update(content)
+    }
+
+    private nonisolated static func endActivityImmediately(eventID: String) async {
+        guard let activity = Activity<DoseActivityAttributes>.activities
+            .first(where: { $0.attributes.eventID == eventID }) else { return }
+        await activity.end(nil, dismissalPolicy: .immediate)
+    }
+
+    private nonisolated static func endActivity(eventID: String, after date: Date) async {
+        guard let activity = Activity<DoseActivityAttributes>.activities
+            .first(where: { $0.attributes.eventID == eventID }) else { return }
+        await activity.end(nil, dismissalPolicy: .after(date))
+    }
+
+    private nonisolated static func endAllActivities() async {
+        for activity in Activity<DoseActivityAttributes>.activities {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
     }
@@ -115,12 +154,9 @@ public final class LiveActivityService {
         dismissTasks[eventID] = task
     }
 
-    /// End the activity for `eventID` with an `.after(date)` dismissal so the
-    /// system clears it from the Lock Screen once the window has elapsed.
     private func autoDismiss(eventID: String, after date: Date) async {
         dismissTasks[eventID] = nil
-        guard let activity = currentActivity(for: eventID) else { return }
-        await activity.end(nil, dismissalPolicy: .after(date))
+        await Self.endActivity(eventID: eventID, after: date)
     }
 
     private func cancelAutoDismiss(for eventID: String) {
@@ -128,20 +164,11 @@ public final class LiveActivityService {
         dismissTasks[eventID] = nil
     }
 
-    // MARK: Lookup
-
-    /// Resolve the system's activity for a slot id as a fresh, disconnected
-    /// value (never cached in `self`, so it can be sent into ActivityKit's
-    /// async methods without a data-race diagnostic).
-    private func currentActivity(for eventID: String) -> Activity<DoseActivityAttributes>? {
-        Activity<DoseActivityAttributes>.activities.first { $0.attributes.eventID == eventID }
-    }
+    // MARK: Helpers
 
     private func skippedCount(in event: DoseEvent) -> Int {
         event.items.filter { $0.status == .skipped }.count
     }
-
-    // MARK: Mapping
 
     /// Build the ActivityKit content state from a dose event.
     static func contentState(from event: DoseEvent) -> DoseActivityAttributes.ContentState {
