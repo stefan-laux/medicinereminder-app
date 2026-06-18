@@ -385,7 +385,7 @@ public struct AddEditMedicineView: View {
             .accessibilityLabel("Dose \(index + 1) time")
             .accessibilityValue(slot.displayString)
         }
-        .onDelete(perform: canRemoveSlots ? removeSlots : nil)
+        .onDelete(perform: slotDeleteAction)
 
         if canAddSlots {
             Button {
@@ -546,6 +546,15 @@ public struct AddEditMedicineView: View {
 
     private var canRemoveSlots: Bool {
         timeSlots.count > 1 && frequency == .specificDays
+    }
+
+    /// Swipe-to-delete handler for dose-time rows, or `nil` when removal isn't
+    /// allowed. The explicit closure type (instead of an inline
+    /// `cond ? removeSlots : nil` ternary) avoids a type-checker inference
+    /// failure in `.onDelete(perform:)`.
+    private var slotDeleteAction: ((IndexSet) -> Void)? {
+        guard canRemoveSlots else { return nil }
+        return { offsets in removeSlots(at: offsets) }
     }
 
     // MARK: - Bindings
