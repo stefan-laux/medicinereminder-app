@@ -210,8 +210,17 @@ public struct AddEditMedicineView: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(drug.brandName)\(drug.genericName.map { ", \($0)" } ?? "")")
+        .accessibilityLabel(suggestionAccessibilityLabel(drug))
         .accessibilityHint("Uses this FDA medicine name.")
+    }
+
+    /// Spoken label for an FDA suggestion row (kept out of string interpolation
+    /// to keep the view's type-checking cheap).
+    private func suggestionAccessibilityLabel(_ drug: FDADrug) -> String {
+        if let generic = drug.genericName, !generic.isEmpty {
+            return "\(drug.brandName), \(generic)"
+        }
+        return drug.brandName
     }
 
     // MARK: - Dosage section
@@ -352,7 +361,7 @@ public struct AddEditMedicineView: View {
                 DatePicker("Starts", selection: $startDate, displayedComponents: .date)
                     .accessibilityLabel("Schedule start date")
 
-                Toggle("Has end date", isOn: $hasEndDate.animation(reduceMotion ? nil : .snappy))
+                Toggle("Has end date", isOn: $hasEndDate.animation(endToggleAnimation))
                     .accessibilityLabel("Has end date")
 
                 if hasEndDate {
@@ -515,6 +524,13 @@ public struct AddEditMedicineView: View {
 
     private var colorColumns: [GridItem] {
         [GridItem(.adaptive(minimum: 44), spacing: Spacing.md)]
+    }
+
+    /// Explicitly-typed animation for the end-date toggle. Declaring the type
+    /// (and using `Animation.snappy`, not the bare `.snappy` member) avoids a
+    /// type-checker inference failure in the `Binding.animation(_:)` call.
+    private var endToggleAnimation: Animation? {
+        reduceMotion ? nil : Animation.snappy
     }
 
     /// Whether the current frequency permits adding extra daily time slots.
