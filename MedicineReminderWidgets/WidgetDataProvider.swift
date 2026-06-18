@@ -90,18 +90,21 @@ struct DoseSnapshot: Sendable {
     }
 }
 
-// MARK: - Data loading (@MainActor — touches SwiftData)
+// MARK: - Data loading (nonisolated — each reload uses its own ModelContext)
 
-/// Loads dose data from the shared App Group store. All methods are
-/// `@MainActor` because they read a SwiftData `ModelContext`.
+/// Loads dose data from the shared App Group store. Methods are nonisolated and
+/// create a fresh `ModelContext` per call (rather than the `@MainActor`
+/// `mainContext`), so the closure-based `TimelineProvider` callbacks can run
+/// synchronously without sending the non-Sendable `completion` across an
+/// isolation boundary (Swift 6 strict concurrency).
 enum WidgetDataProvider {
 
     /// Fetch all non-archived medicines and recent logs, then compute the
     /// snapshot relative to `date`. Returns an empty (but valid) snapshot on
     /// any read failure so widgets never crash.
-    @MainActor
     static func snapshot(for date: Date, calendar: Calendar = .current) -> DoseSnapshot {
-        let context = SharedModelContainer.shared.mainContext
+        // A dedicated context for this reload — usable off the main actor.
+        let context = ModelContext(SharedModelContainer.shared)
 
         let medicines = fetchMedicines(in: context)
         guard !medicines.isEmpty else {
@@ -138,7 +141,6 @@ enum WidgetDataProvider {
 
     // MARK: Fetch helpers
 
-    @MainActor
     private static func fetchMedicines(in context: ModelContext) -> [Medicine] {
         let descriptor = FetchDescriptor<Medicine>(
             predicate: #Predicate { !$0.isArchived },
@@ -147,7 +149,6 @@ enum WidgetDataProvider {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    @MainActor
     private static func fetchRelevantLogs(
         in context: ModelContext,
         around date: Date,
@@ -208,42 +209,38 @@ struct DoseTimelineProvider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (DoseEntry) -> Void) {
         let now = Date()
-        Task { @MainActor in
-            let snapshot = WidgetDataProvider.snapshot(for: now)
-            completion(DoseEntry(date: now, snapshot: snapshot))
-        }
+        let snapshot = WidgetDataProvider.snapshot(for: now)
+        completion(DoseEntry(date: now, snapshot: snapshot))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<DoseEntry>) -> Void) {
         let now = Date()
-        Task { @MainActor in
-            let calendar = Calendar.current
-            var entries: [DoseEntry] = []
+        let calendar = Calendar.current
+        var entries: [DoseEntry] = []
 
-            // Always include "now".
-            let nowSnapshot = WidgetDataProvider.snapshot(for: now, calendar: calendar)
-            entries.append(DoseEntry(date: now, snapshot: nowSnapshot))
+        // Always include "now".
+        let nowSnapshot = WidgetDataProvider.snapshot(for: now, calendar: calendar)
+        entries.append(DoseEntry(date: now, snapshot: nowSnapshot))
 
-            // Add an entry at each upcoming dose time today so the widget flips
-            // a dose from "upcoming" to "due/now" exactly on time. Cap the
-            // count to stay within WidgetKit's per-refresh budget.
-            let upcomingTimes = nowSnapshot.todaysEvents
-                .map(\.time)
-                .filter { $0 > now }
-                .prefix(6)
+        // Add an entry at each upcoming dose time today so the widget flips
+        // a dose from "upcoming" to "due/now" exactly on time. Cap the
+        // count to stay within WidgetKit's per-refresh budget.
+        let upcomingTimes = nowSnapshot.todaysEvents
+            .map(\.time)
+            .filter { $0 > now }
+            .prefix(6)
 
-            for time in upcomingTimes {
-                entries.append(DoseEntry(date: time, snapshot: WidgetDataProvider.snapshot(for: time, calendar: calendar)))
-            }
-
-            // Refresh policy: reload at the next dose boundary if there is one,
-            // otherwise in an hour to keep relative-time labels honest.
-            let reloadDate: Date = upcomingTimes.first
-                ?? calendar.date(byAdding: .hour, value: 1, to: now)
-                ?? now.addingTimeInterval(3600)
-
-            let timeline = Timeline(entries: entries.sorted { $0.date < $1.date }, policy: .after(reloadDate))
-            completion(timeline)
+        for time in upcomingTimes {
+            entries.append(DoseEntry(date: time, snapshot: WidgetDataProvider.snapshot(for: time, calendar: calendar)))
         }
+
+        // Refresh policy: reload at the next dose boundary if there is one,
+        // otherwise in an hour to keep relative-time labels honest.
+        let reloadDate: Date = upcomingTimes.first
+            ?? calendar.date(byAdding: .hour, value: 1, to: now)
+            ?? now.addingTimeInterval(3600)
+
+        let timeline = Timeline(entries: entries.sorted { $0.date < $1.date }, policy: .after(reloadDate))
+        completion(timeline)
     }
 }
