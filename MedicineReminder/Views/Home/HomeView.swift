@@ -28,6 +28,8 @@ public struct HomeView: View {
     @State private var didAppear = false
     /// Controls presentation of the add-medicine sheet.
     @State private var showingAdd = false
+    /// Controls presentation of the medicines list (for editing).
+    @State private var showingMedicines = false
 
     public init() {}
 
@@ -40,6 +42,15 @@ public struct HomeView: View {
             .navigationTitle("Today")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingMedicines = true
+                    } label: {
+                        Image(systemName: "pills")
+                    }
+                    .accessibilityLabel("Your medicines")
+                    .accessibilityHint("View and edit your medicines")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingAdd = true
@@ -52,6 +63,9 @@ public struct HomeView: View {
             }
             .sheet(isPresented: $showingAdd) {
                 AddEditMedicineView()
+            }
+            .sheet(isPresented: $showingMedicines) {
+                MedicinesListView()
             }
         }
         .onAppear {
