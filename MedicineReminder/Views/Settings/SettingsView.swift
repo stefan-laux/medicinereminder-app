@@ -3,9 +3,9 @@
 //  MedicineReminder — Settings
 //
 //  A Liquid Glass grouped settings screen:
-//   • Reminders — default snooze duration, notification sound choice/toggle.
+//   • Reminders — default snooze duration.
 //   • Weekly summary — Sunday-evening adherence digest via NotificationService.
-//   • Siri & Shortcuts — SiriTipView tips for the app's App Intents.
+//   • Siri & Shortcuts — example phrases + a tappable Shortcuts link.
 //   • Data — CSV export via ExportService + ShareLink.
 //
 //  Persisted preferences live in the App Group UserDefaults suite so the
@@ -13,7 +13,6 @@
 //
 
 import AppIntents
-import AudioToolbox
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -24,8 +23,6 @@ import UniformTypeIdentifiers
 /// Kept `enum`/`static` and `fileprivate` so they never collide with other files.
 fileprivate enum SettingsKey {
     static let defaultSnoozeMinutes = "settings.defaultSnoozeMinutes"
-    static let notificationSoundEnabled = "settings.notificationSoundEnabled"
-    static let notificationSound = "settings.notificationSound"
     static let weeklySummaryEnabled = "settings.weeklySummaryEnabled"
     /// Whether the app's Siri / App Intents integration is enabled. Mirrored by
     /// the intents layer (which reads this key from the shared suite) so a
@@ -38,42 +35,6 @@ fileprivate enum SettingsKey {
     /// Weekly summary fires Sunday (Calendar weekday == 1) at 6 PM by default.
     static let summaryWeekday = 1
     static let summaryHour = 18
-}
-
-/// The selectable notification sounds. Raw values are stable identifiers stored
-/// in the shared suite; the widget/app can map them to `UNNotificationSound`.
-fileprivate enum NotificationSoundChoice: String, CaseIterable, Identifiable {
-    case `default`, gentle, chime, alert
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .default: String(localized: "Default")
-        case .gentle: String(localized: "Gentle")
-        case .chime: String(localized: "Chime")
-        case .alert: String(localized: "Alert")
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .default: "bell.fill"
-        case .gentle: "bell.badge.waveform"
-        case .chime: "bell.and.waves.left.and.right.fill"
-        case .alert: "bell.badge.fill"
-        }
-    }
-
-    /// System sound played once as a preview when the user picks this option.
-    var previewSoundID: SystemSoundID {
-        switch self {
-        case .default: 1007
-        case .gentle: 1003
-        case .chime: 1013
-        case .alert: 1005
-        }
-    }
 }
 
 /// Common snooze durations offered in the picker (minutes).
@@ -98,12 +59,6 @@ struct SettingsView: View {
     @AppStorage(SettingsKey.defaultSnoozeMinutes, store: Self.store)
     private var defaultSnoozeMinutes: Int = SettingsKey.defaultSnoozeFallback
 
-    @AppStorage(SettingsKey.notificationSoundEnabled, store: Self.store)
-    private var notificationSoundEnabled: Bool = true
-
-    @AppStorage(SettingsKey.notificationSound, store: Self.store)
-    private var notificationSoundRaw: String = NotificationSoundChoice.default.rawValue
-
     @AppStorage(SettingsKey.weeklySummaryEnabled, store: Self.store)
     private var weeklySummaryEnabled: Bool = false
 
@@ -119,10 +74,6 @@ struct SettingsView: View {
     /// suite is unavailable (e.g. mis-provisioned), so the screen never crashes.
     fileprivate static let store: UserDefaults =
         UserDefaults(suiteName: AppGroup.identifier) ?? .standard
-
-    private var selectedSound: NotificationSoundChoice {
-        NotificationSoundChoice(rawValue: notificationSoundRaw) ?? .default
-    }
 
     var body: some View {
         NavigationStack {
@@ -174,45 +125,10 @@ struct SettingsView: View {
             }
             .accessibilityLabel(Text("Default snooze duration"))
             .accessibilityValue(Text(snoozeLabel(defaultSnoozeMinutes)))
-
-            Toggle(isOn: $notificationSoundEnabled) {
-                Label {
-                    Text("Reminder sound")
-                } icon: {
-                    Image(systemName: notificationSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                        .foregroundStyle(MedicineColor.teal.color)
-                }
-            }
-            .accessibilityLabel(Text("Reminder sound"))
-            .accessibilityValue(Text(notificationSoundEnabled ? "On" : "Off"))
-            .onChange(of: notificationSoundEnabled) { _, enabled in
-                if enabled { playSoundPreview(selectedSound) }
-            }
-
-            if notificationSoundEnabled {
-                Picker(selection: $notificationSoundRaw) {
-                    ForEach(NotificationSoundChoice.allCases) { sound in
-                        Label(sound.displayName, systemImage: sound.systemImage)
-                            .tag(sound.rawValue)
-                    }
-                } label: {
-                    Label {
-                        Text("Sound")
-                    } icon: {
-                        Image(systemName: "music.note")
-                            .foregroundStyle(MedicineColor.violet.color)
-                    }
-                }
-                .accessibilityLabel(Text("Notification sound"))
-                .accessibilityValue(Text(selectedSound.displayName))
-                .onChange(of: notificationSoundRaw) { _, newValue in
-                    playSoundPreview(NotificationSoundChoice(rawValue: newValue) ?? .default)
-                }
-            }
         } header: {
             Text("Reminders")
         } footer: {
-            Text("Choose how long the Snooze action delays a dose, and the sound your reminders play.")
+            Text("How long the Snooze action delays a dose. Reminders play the system's default notification sound.")
         }
     }
 
@@ -283,20 +199,21 @@ struct SettingsView: View {
             .accessibilityHint(Text("Lets Siri log doses and check what's coming up"))
 
             if siriEnabled {
-                SiriTipView(intent: LogDoseTakenIntent())
-                    .siriTipViewStyle(.dark)
-                    .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
-                                              bottom: Spacing.sm, trailing: Spacing.lg))
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Try saying:")
+                        .font(AppFont.caption)
+                        .foregroundStyle(.secondary)
+                    Text("“Hey Siri, log my medicine in MedicineReminder”")
+                        .font(AppFont.subheadline)
+                    Text("“Hey Siri, what do I need to take in MedicineReminder?”")
+                        .font(AppFont.subheadline)
+                }
+                .padding(.vertical, Spacing.xs)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(Text("Example Siri phrases"))
 
-                SiriTipView(intent: CheckUpcomingDosesIntent())
-                    .siriTipViewStyle(.dark)
-                    .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
-                                              bottom: Spacing.sm, trailing: Spacing.lg))
-
-                // Tappable — opens the Shortcuts app to add/run these shortcuts.
+                // The one genuinely-tappable control: opens the Shortcuts app.
                 ShortcutsLink()
-                    .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
-                                              bottom: Spacing.sm, trailing: Spacing.lg))
                     .accessibilityLabel(Text("Open in Shortcuts"))
                     .accessibilityHint(Text("Opens the Shortcuts app to add or run these shortcuts"))
             }
@@ -304,7 +221,7 @@ struct SettingsView: View {
             Text("Siri & Shortcuts")
         } footer: {
             Text(siriEnabled
-                 ? "Ask Siri to log a dose or check what's coming up. Tap a tip to try it."
+                 ? "Say these to Siri on your device. Tap Shortcuts to add or run them by hand. (Siri voice needs a real device — it can't be tested in the Simulator.)"
                  : "Siri voice commands for logging and checking doses are turned off.")
         }
     }
@@ -379,12 +296,6 @@ struct SettingsView: View {
         let medicines = (try? modelContext.fetch(FetchDescriptor<Medicine>())) ?? []
         let logs = (try? modelContext.fetch(FetchDescriptor<DoseLog>())) ?? []
         exportDocument = CSVDocument(text: ExportService.csv(medicines: medicines, logs: logs))
-    }
-
-    /// Play the chosen reminder sound once so the user can preview it.
-    private func playSoundPreview(_ sound: NotificationSoundChoice) {
-        guard notificationSoundEnabled else { return }
-        AudioServicesPlaySystemSound(sound.previewSoundID)
     }
 }
 
