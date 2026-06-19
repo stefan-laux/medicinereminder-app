@@ -17,7 +17,10 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: "54MYV55XF5"  # Apple Developer Team ID (Personal Team)
     CODE_SIGN_STYLE: Automatic
-    TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad (iPadOS 26)
+    TARGETED_DEVICE_FAMILY: "1,2"   # iPhone + iPad only
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD: NO
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     SWIFT_EMIT_LOC_STRINGS: YES
@@ -36,17 +39,17 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.stefanlaux.medicinereminder
         PRODUCT_NAME: MedicineReminder
-        INFOPLIST_KEY_CFBundleDisplayName: MedicineReminder
+        INFOPLIST_KEY_CFBundleDisplayName: "Med Reminder"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait"
         ENABLE_PREVIEWS: YES
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: YES
     info:
       path: MedicineReminder/Info.plist
       properties:
-        CFBundleDisplayName: MedicineReminder
+        CFBundleDisplayName: "Med Reminder"
         # An (empty) launch screen is REQUIRED for the app to use the full native
         # screen size — without it iOS renders the app letterboxed/scaled.
         UILaunchScreen: {}

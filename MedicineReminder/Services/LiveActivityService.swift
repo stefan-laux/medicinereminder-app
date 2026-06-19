@@ -20,13 +20,18 @@ public final class LiveActivityService {
     /// Pending auto-dismiss tasks keyed by slot id (`Task` is Sendable).
     private var dismissTasks: [String: Task<Void, Never>] = [:]
 
-    /// How long after the slot time an unacted activity auto-dismisses.
-    private let window: TimeInterval = 2 * 60 * 60
-
     /// A dose's Live Activity only appears within this lead time before its slot
     /// (so an 8:00 dose won't show at 6:00). Doses further out are left to
     /// notifications.
     public static let leadTime: TimeInterval = 5 * 60
+
+    /// The activity stays up until the user resolves the dose or the day ends.
+    /// Returns the end of `date`'s day (next midnight).
+    private static func endOfDay(for date: Date) -> Date {
+        let calendar = Calendar.current
+        return calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date))
+            ?? date.addingTimeInterval(12 * 60 * 60)
+    }
 
     private init() {}
 
@@ -47,7 +52,7 @@ public final class LiveActivityService {
             .filter { event in
                 event.items.contains { $0.status == .pending }
                     && event.time <= now.addingTimeInterval(Self.leadTime)  // at most 5 min before the slot
-                    && event.time.addingTimeInterval(window) > now           // not yet auto-dismissed
+                    && Self.endOfDay(for: event.time) > now           // not yet auto-dismissed
             }
             .min(by: { $0.time < $1.time })
 
@@ -75,7 +80,7 @@ public final class LiveActivityService {
         let started = Self.requestActivity(
             attributes: attributes,
             state: Self.contentState(from: event),
-            staleDate: event.time.addingTimeInterval(window)
+            staleDate: Self.endOfDay(for: event.time)
         )
         if started { scheduleAutoDismiss(for: event) }
     }
@@ -84,7 +89,7 @@ public final class LiveActivityService {
     public func update(for event: DoseEvent) async {
         guard Self.hasActivity(eventID: event.id) else { return }
         let state = Self.contentState(from: event)
-        await Self.updateActivity(eventID: event.id, state: state, staleDate: event.time.addingTimeInterval(window))
+        await Self.updateActivity(eventID: event.id, state: state, staleDate: Self.endOfDay(for: event.time))
 
         // Retire the activity once nothing in the slot is still pending (taken,
         // skipped, or snoozed all count as resolved); otherwise keep an
@@ -171,7 +176,7 @@ public final class LiveActivityService {
 
     private func scheduleAutoDismiss(for event: DoseEvent) {
         let eventID = event.id
-        let dismissDate = event.time.addingTimeInterval(window)
+        let dismissDate = Self.endOfDay(for: event.time)
 
         dismissTasks[eventID]?.cancel()
         let delay = dismissDate.timeIntervalSinceNow
