@@ -85,3 +85,17 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.stefanlaux.medicinereminder
+
+# A single shared scheme that runs the app (the widget builds automatically as an
+# embedded dependency). Defining it here means `xcodegen generate` always
+# produces the MedicineReminder app scheme — and no standalone widget scheme to
+# accidentally run (which triggers the _XCWidgetKind error).
+schemes:
+  MedicineReminder:
+    build:
+      targets:
+        MedicineReminder: all
+    run:
+      config: Debug
+    archive:
+      config: Release
