@@ -46,6 +46,7 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait"
         ENABLE_PREVIEWS: YES
         ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: MedicineReminder/Info.plist
       properties:
