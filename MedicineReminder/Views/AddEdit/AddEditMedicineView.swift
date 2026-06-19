@@ -503,7 +503,7 @@ public struct AddEditMedicineView: View {
         iconName = medicine.iconName
         notes = medicine.notes
 
-        if let schedule = medicine.schedules.first {
+        if let schedule = medicine.schedules?.first {
             frequency = schedule.frequency
             timeSlots = schedule.timeSlots.isEmpty ? defaultSlots(for: schedule.frequency) : schedule.timeSlots
             intervalHours = schedule.intervalHours
@@ -671,7 +671,7 @@ public struct AddEditMedicineView: View {
     /// Update the medicine's primary schedule in place (reuse the first one so
     /// existing relationships/ids stay stable), or attach a new schedule.
     private func applySchedule(_ schedule: DoseSchedule, to medicine: Medicine) {
-        if let existing = medicine.schedules.first {
+        if let existing = medicine.schedules?.first {
             existing.frequencyRaw = schedule.frequencyRaw
             existing.timeSlots = schedule.timeSlots
             existing.intervalHours = schedule.intervalHours

@@ -79,7 +79,7 @@ public enum StreakCalculator {
     private static func earliestDay(medicines: [Medicine], calendar: Calendar) -> Date? {
         let starts = medicines
             .filter { !$0.isArchived }
-            .flatMap { $0.schedules }
+            .flatMap { $0.schedules ?? [] }
             .filter { $0.isActive && $0.frequency != .asNeeded }
             .map { calendar.startOfDay(for: $0.startDate) }
         return starts.min()

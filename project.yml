@@ -61,6 +61,15 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.stefanlaux.medicinereminder
+        # --- iCloud sync (CloudKit) — PAID Apple Developer account required. ---
+        # Uncomment these two keys HERE and on the widget target below, then run
+        # `xcodegen generate`. A free Personal Team cannot sign the iCloud
+        # entitlement, so leave them commented until you've enrolled. Also enable
+        # "Push Notifications" in Xcode (CloudKit uses silent pushes to sync).
+        # com.apple.developer.icloud-services:
+        #   - CloudKit
+        # com.apple.developer.icloud-container-identifiers:
+        #   - iCloud.com.stefanlaux.medicinereminder
 
   MedicineReminderWidgets:
     type: app-extension
@@ -85,6 +94,11 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.stefanlaux.medicinereminder
+        # --- iCloud sync (CloudKit) — uncomment together with the app target. ---
+        # com.apple.developer.icloud-services:
+        #   - CloudKit
+        # com.apple.developer.icloud-container-identifiers:
+        #   - iCloud.com.stefanlaux.medicinereminder
 
 # A single shared scheme that runs the app (the widget builds automatically as an
 # embedded dependency). Defining it here means `xcodegen generate` always

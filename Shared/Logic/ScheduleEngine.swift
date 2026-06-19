@@ -94,7 +94,7 @@ public enum ScheduleEngine {
         var grouped: [String: (time: Date, items: [DoseEventItem])] = [:]
 
         for medicine in medicines where !medicine.isArchived {
-            for schedule in medicine.schedules {
+            for schedule in medicine.schedules ?? [] {
                 for time in occurrences(for: schedule, on: day, calendar: calendar) {
                     let sid = slotID(time, calendar: calendar)
                     let key = LogKey(medicineID: medicine.id, slotID: sid)

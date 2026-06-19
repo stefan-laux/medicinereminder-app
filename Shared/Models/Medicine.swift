@@ -4,23 +4,25 @@ import SwiftData
 // Medicine.swift
 @Model
 public final class Medicine {
-    @Attribute(.unique) public var id: UUID
-    public var name: String
-    public var dosageAmount: Double
-    public var unitRaw: String            // DosageUnit.rawValue
-    public var colorRaw: String           // MedicineColor.rawValue
-    public var iconName: String           // SF Symbol
-    public var notes: String
-    public var isCustom: Bool             // true when no FDA match
+    // CloudKit-compatible: no `.unique`, every attribute has a default value, and
+    // the to-many relationships are optional.
+    public var id: UUID = UUID()
+    public var name: String = ""
+    public var dosageAmount: Double = 0
+    public var unitRaw: String = DosageUnit.mg.rawValue          // DosageUnit.rawValue
+    public var colorRaw: String = MedicineColor.default.rawValue // MedicineColor.rawValue
+    public var iconName: String = "pills.fill"                   // SF Symbol
+    public var notes: String = ""
+    public var isCustom: Bool = false                            // true when no FDA match
     public var fdaGenericName: String?
-    public var createdAt: Date
-    public var isArchived: Bool
-    public var sortIndex: Int
+    public var createdAt: Date = Date()
+    public var isArchived: Bool = false
+    public var sortIndex: Int = 0
 
     @Relationship(deleteRule: .cascade, inverse: \DoseSchedule.medicine)
-    public var schedules: [DoseSchedule]
+    public var schedules: [DoseSchedule]?
     @Relationship(deleteRule: .cascade, inverse: \DoseLog.medicine)
-    public var logs: [DoseLog]
+    public var logs: [DoseLog]?
 
     public init(id: UUID = UUID(), name: String, dosageAmount: Double, unit: DosageUnit,
                 color: MedicineColor = .default, iconName: String = "pills.fill", notes: String = "",

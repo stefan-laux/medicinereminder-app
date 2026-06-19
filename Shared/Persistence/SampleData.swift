@@ -23,7 +23,7 @@ import SwiftData
         var rng = SeededGenerator(seed: 0xC0FFEE)
 
         for medicine in medicines {
-            for schedule in medicine.schedules {
+            for schedule in medicine.schedules ?? [] {
                 var day = windowStart
                 var safety = 0
                 while day <= today && safety < 400 {
@@ -40,7 +40,6 @@ import SwiftData
                             source: .manual
                         )
                         log.medicine = medicine
-                        medicine.logs.append(log)
                         context.insert(log)
                     }
                     guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
