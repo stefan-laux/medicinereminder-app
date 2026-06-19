@@ -115,7 +115,7 @@ public final class NotificationService {
 
     /// Wipe all pending dose notifications and schedule the next batch (≤60)
     /// computed from each medicine's schedules via `ScheduleEngine`.
-    public func rescheduleAll(medicines: [Medicine]) async {
+    public func rescheduleAll(medicines: [Medicine], logs: [DoseLog], excludingSlot excludedSlotID: String?) async {
         await cancelAllDoseRequests()
 
         let active = medicines.filter { !$0.isArchived }
@@ -125,10 +125,16 @@ public final class NotificationService {
         let to = calendar.date(byAdding: .day, value: NotificationIDs.lookaheadDays, to: now) ?? now
 
         // Group occurrences into events so co-due medicines share one reminder.
-        let events = ScheduleEngine.events(for: active, logs: [], from: now, to: to, calendar: calendar)
+        let events = ScheduleEngine.events(for: active, logs: logs, from: now, to: to, calendar: calendar)
 
+        // Only remind for upcoming slots that still have a pending dose, and skip
+        // the slot the Live Activity is already handling.
         let upcoming = events
-            .filter { $0.time > now && !$0.items.isEmpty }
+            .filter { event in
+                event.time > now
+                    && event.id != excludedSlotID
+                    && event.items.contains { $0.status == .pending }
+            }
             .sorted { $0.time < $1.time }
             .prefix(NotificationIDs.maxScheduled)
 

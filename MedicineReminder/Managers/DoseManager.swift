@@ -8,8 +8,8 @@ import WidgetKit
 /// a dose mutation: persistence, widget refresh, Live Activity reconciliation,
 /// and haptics.
 ///
-/// Notifications are intentionally not used — reminders surface only via the
-/// Live Activity (see ``LiveActivityService``).
+/// Reminders use the Live Activity when the app can show one, with a local
+/// notification as a fallback for the doses it isn't covering.
 @MainActor
 @Observable
 public final class DoseManager {
@@ -25,6 +25,8 @@ public final class DoseManager {
 
     @ObservationIgnored private let context: ModelContext
     @ObservationIgnored private let calendar = Calendar.current
+    /// Logs from the last reload, reused by the external sync (fallback notifications).
+    @ObservationIgnored private var cachedLogs: [DoseLog] = []
 
     public init(context: ModelContext) {
         self.context = context
@@ -40,6 +42,7 @@ public final class DoseManager {
         let logs = fetchLogs()
 
         medicines = activeMedicines
+        cachedLogs = logs
         todaysEvents = ScheduleEngine.events(for: activeMedicines, logs: logs, on: Date(), calendar: calendar)
         currentStreak = StreakCalculator.currentStreak(medicines: activeMedicines, logs: logs, asOf: Date(), calendar: calendar)
         longestStreak = StreakCalculator.longestStreak(medicines: activeMedicines, logs: logs, asOf: Date(), calendar: calendar)
@@ -136,7 +139,15 @@ public final class DoseManager {
     private func syncExternal() {
         WidgetCenter.shared.reloadAllTimelines()
         let events = todaysEvents
-        Task { await LiveActivityService.shared.sync(events: events) }
+        let meds = medicines
+        let logs = cachedLogs
+        Task {
+            // Live Activity claims the soonest pending dose; schedule fallback
+            // notifications for the rest (so a reminder still fires when the app
+            // isn't open to show a Live Activity).
+            let coveredSlot = await LiveActivityService.shared.sync(events: events)
+            await NotificationService.shared.rescheduleAll(medicines: meds, logs: logs, excludingSlot: coveredSlot)
+        }
     }
 
     /// Default snooze interval (minutes), shared with the App Intents layer.

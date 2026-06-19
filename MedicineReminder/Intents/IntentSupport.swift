@@ -66,8 +66,8 @@ enum IntentSupport {
 
     // MARK: Side effects (run after a mutation)
 
-    /// Refresh the widgets and reconcile the Live Activity from freshly mutated
-    /// data. Notifications are not used.
+    /// Refresh the widgets, reconcile the Live Activity, and reschedule fallback
+    /// notifications (for the doses the Live Activity isn't covering).
     @MainActor
     static func refreshAfterMutation() async {
         let medicines = (try? activeMedicines()) ?? []
@@ -75,7 +75,8 @@ enum IntentSupport {
         let events = ScheduleEngine.events(for: medicines, logs: logs, on: Date())
 
         WidgetCenter.shared.reloadAllTimelines()
-        await LiveActivityService.shared.sync(events: events)
+        let coveredSlot = await LiveActivityService.shared.sync(events: events)
+        await NotificationService.shared.rescheduleAll(medicines: medicines, logs: logs, excludingSlot: coveredSlot)
     }
 
     // MARK: Spoken formatting

@@ -1,6 +1,7 @@
 import SwiftData
 import UIKit
 import UserNotifications
+import WidgetKit
 
 /// Handles notification action buttons (TAKE / SKIP / SNOOZE) and foreground
 /// presentation. Mutations route through `DoseActions` against the shared
@@ -16,11 +17,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 extension AppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
 
-    /// Show dose reminders as banners + sound even when the app is foregrounded.
+    /// Suppress notification banners while the app is in the foreground — the
+    /// in-app UI and Live Activity already present the dose there.
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification) async
         -> UNNotificationPresentationOptions {
-        [.banner, .sound, .list]
+        []
     }
 
     /// Respond to action-button taps from a delivered notification.
@@ -79,12 +81,11 @@ extension AppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
             FetchDescriptor<Medicine>(predicate: #Predicate { !$0.isArchived })
         )) ?? []
         let logs = (try? context.fetch(FetchDescriptor<DoseLog>())) ?? []
-        let next = ScheduleEngine.nextEvent(for: medicines, logs: logs, after: Date())
+        let events = ScheduleEngine.events(for: medicines, logs: logs, on: Date())
 
-        await NotificationService.shared.rescheduleAll(medicines: medicines)
-        if let next {
-            await LiveActivityService.shared.update(for: next)
-        }
+        WidgetCenter.shared.reloadAllTimelines()
+        let coveredSlot = await LiveActivityService.shared.sync(events: events)
+        await NotificationService.shared.rescheduleAll(medicines: medicines, logs: logs, excludingSlot: coveredSlot)
     }
 
     // MARK: Helpers

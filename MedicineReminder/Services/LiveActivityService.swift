@@ -31,8 +31,12 @@ public final class LiveActivityService {
     /// activity — for the soonest dose that still has a pending item — and end
     /// every other or already-resolved activity. Call on launch, when the app
     /// becomes active, and after any dose mutation.
-    public func sync(events: [DoseEvent]) async {
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+    /// Returns the slot id of the dose the Live Activity is now covering (or
+    /// `nil` if none / activities are unavailable) so the caller can skip a
+    /// redundant fallback notification for that slot.
+    @discardableResult
+    public func sync(events: [DoseEvent]) async -> String? {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return nil }
         let now = Date()
         let active = events
             .filter { event in
@@ -46,7 +50,9 @@ public final class LiveActivityService {
 
         if let active {
             await startOrUpdate(for: active, title: title(for: active))
+            return active.id
         }
+        return nil
     }
 
     /// Start a Live Activity for the given dose event, or update it if one is

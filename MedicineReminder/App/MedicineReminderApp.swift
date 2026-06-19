@@ -25,12 +25,22 @@ struct MedicineReminderApp: App {
         WindowGroup {
             RootView()
                 .environment(doseManager)
+                .task { await bootstrap() }
                 .onChange(of: scenePhase) { _, phase in
-                    // Notifications are not used. Reconcile the Live Activity and
-                    // refresh widgets whenever the app comes to the foreground.
+                    // Reconcile the Live Activity + widgets (and fallback
+                    // notifications) whenever the app returns to the foreground.
                     if phase == .active { doseManager.reload() }
                 }
         }
         .modelContainer(container)
+    }
+
+    /// Request notification permission — used only as a fallback for when the app
+    /// isn't open to show a Live Activity — and register the dose action category.
+    @MainActor
+    private func bootstrap() async {
+        NotificationService.shared.registerCategories()
+        _ = await NotificationService.shared.requestAuthorization()
+        doseManager.reload()
     }
 }
