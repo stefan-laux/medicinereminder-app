@@ -23,6 +23,11 @@ public final class LiveActivityService {
     /// How long after the slot time an unacted activity auto-dismisses.
     private let window: TimeInterval = 2 * 60 * 60
 
+    /// A dose's Live Activity only appears within this lead time before its slot
+    /// (so an 8:00 dose won't show at 6:00). Doses further out are left to
+    /// notifications.
+    public static let leadTime: TimeInterval = 5 * 60
+
     private init() {}
 
     // MARK: Public surface (main actor)
@@ -41,7 +46,8 @@ public final class LiveActivityService {
         let active = events
             .filter { event in
                 event.items.contains { $0.status == .pending }
-                    && event.time.addingTimeInterval(window) > now
+                    && event.time <= now.addingTimeInterval(Self.leadTime)  // at most 5 min before the slot
+                    && event.time.addingTimeInterval(window) > now           // not yet auto-dismissed
             }
             .min(by: { $0.time < $1.time })
 

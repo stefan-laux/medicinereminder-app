@@ -27,6 +27,9 @@ public final class DoseManager {
     @ObservationIgnored private let calendar = Calendar.current
     /// Logs from the last reload, reused by the external sync (fallback notifications).
     @ObservationIgnored private var cachedLogs: [DoseLog] = []
+    /// One-shot timer that re-syncs when the next dose crosses into the Live
+    /// Activity lead window, so its activity can appear ~5 min before the slot.
+    @ObservationIgnored private var leadTimer: Task<Void, Never>?
 
     public init(context: ModelContext) {
         self.context = context
@@ -147,6 +150,31 @@ public final class DoseManager {
             // isn't open to show a Live Activity).
             let coveredSlot = await LiveActivityService.shared.sync(events: events)
             await NotificationService.shared.rescheduleAll(medicines: meds, logs: logs, excludingSlot: coveredSlot)
+        }
+        scheduleLeadRefresh()
+    }
+
+    /// While the app is running, wake up to re-sync exactly when the next dose
+    /// crosses into the Live Activity lead window (so the activity appears ~5 min
+    /// before the slot). If the app is suspended at that moment the timer won't
+    /// fire — the dose's notification covers that case.
+    private func scheduleLeadRefresh() {
+        leadTimer?.cancel()
+        let lead = LiveActivityService.leadTime
+        let now = Date()
+        let upcoming = todaysEvents
+            .filter { event in
+                event.items.contains { $0.status == .pending }
+                    && event.time.addingTimeInterval(-lead) > now
+            }
+            .min(by: { $0.time < $1.time })
+        guard let next = upcoming else { return }
+        let delay = next.time.addingTimeInterval(-lead).timeIntervalSinceNow
+        guard delay > 0 else { return }
+        leadTimer = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            if Task.isCancelled { return }
+            self?.reload()
         }
     }
 
