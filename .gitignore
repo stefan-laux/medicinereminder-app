@@ -17,6 +17,12 @@ Icon?
 !default.xcworkspace
 .xcodegen/
 
+# XcodeGen generates these from project.yml (info:/entitlements:) — never commit
+MedicineReminder/Info.plist
+MedicineReminder/MedicineReminder.entitlements
+MedicineReminderWidgets/Info.plist
+MedicineReminderWidgets/MedicineReminderWidgets.entitlements
+
 # ──────────────────────────────────────────────────────────────────────────
 # Xcode build artifacts & user data
 # ──────────────────────────────────────────────────────────────────────────
