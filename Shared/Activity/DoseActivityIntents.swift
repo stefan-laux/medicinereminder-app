@@ -1,15 +1,15 @@
 //
-//  DoseActivityIntents.swift
-//  MedicineReminderWidgets
+//  DoseActivityIntents.swift  (Shared — compiled into BOTH the app and widget targets)
 //
-//  Interactive App Intents backing the Live Activity (and any widget) Take /
-//  Skip buttons. They conform to `LiveActivityIntent` so they execute in this
-//  extension's process and can update the shared SwiftData store immediately.
+//  Interactive App Intents backing the Live Activity Take / Skip buttons. They
+//  conform to `LiveActivityIntent`, whose `perform()` runs in the *app's*
+//  process — so the type MUST exist in the app target, not just the widget
+//  extension. Living in `Shared` satisfies that. Named with an `Activity` suffix
+//  to avoid clashing with the Siri `SkipDoseIntent` (an `AppIntent`) in the app.
 //
-//  The widget extension does NOT link the app target's `DoseActions`, so the
-//  dose mutation is implemented here directly against the shared App Group
-//  store, mirroring `DoseActions` semantics (locate-or-create the log for the
-//  slot, set its status, save). All SwiftData work is on the @MainActor.
+//  The mutation is implemented directly against the shared App Group store,
+//  mirroring `DoseActions` semantics (locate-or-create the log for the slot, set
+//  its status, save). All SwiftData work is on the @MainActor.
 //
 
 import ActivityKit
@@ -22,28 +22,27 @@ import WidgetKit
 
 /// Marks a specific medicine's dose at a given slot as taken from the Live
 /// Activity / widget.
-struct TakeDoseIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Take Dose"
-    static let description = IntentDescription("Marks a scheduled dose as taken.")
-    /// Run in-app/in-extension so the action is immediate; don't open the app.
-    static let openAppWhenRun: Bool = false
+public struct TakeDoseActivityIntent: LiveActivityIntent {
+    public static let title: LocalizedStringResource = "Take Dose"
+    public static let description = IntentDescription("Marks a scheduled dose as taken.")
+    public static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Medicine ID")
-    var medicineID: String
+    public var medicineID: String
 
     /// Slot time as a Unix timestamp (seconds). 0 == ad-hoc / now.
     @Parameter(title: "Scheduled Time")
-    var scheduledEpoch: Double
+    public var scheduledEpoch: Double
 
-    init() {}
+    public init() {}
 
-    init(medicineID: UUID, scheduledTime: Date?) {
+    public init(medicineID: UUID, scheduledTime: Date?) {
         self.medicineID = medicineID.uuidString
         self.scheduledEpoch = scheduledTime?.timeIntervalSince1970 ?? 0
     }
 
     @MainActor
-    func perform() async throws -> some IntentResult {
+    public func perform() async throws -> some IntentResult {
         try DoseActivityMutations.apply(
             status: .taken,
             medicineIDString: medicineID,
@@ -58,26 +57,26 @@ struct TakeDoseIntent: LiveActivityIntent {
 // MARK: - Skip
 
 /// Marks a specific medicine's dose at a given slot as skipped.
-struct SkipDoseIntent: LiveActivityIntent {
-    static let title: LocalizedStringResource = "Skip Dose"
-    static let description = IntentDescription("Marks a scheduled dose as skipped.")
-    static let openAppWhenRun: Bool = false
+public struct SkipDoseActivityIntent: LiveActivityIntent {
+    public static let title: LocalizedStringResource = "Skip Dose"
+    public static let description = IntentDescription("Marks a scheduled dose as skipped.")
+    public static let openAppWhenRun: Bool = false
 
     @Parameter(title: "Medicine ID")
-    var medicineID: String
+    public var medicineID: String
 
     @Parameter(title: "Scheduled Time")
-    var scheduledEpoch: Double
+    public var scheduledEpoch: Double
 
-    init() {}
+    public init() {}
 
-    init(medicineID: UUID, scheduledTime: Date?) {
+    public init(medicineID: UUID, scheduledTime: Date?) {
         self.medicineID = medicineID.uuidString
         self.scheduledEpoch = scheduledTime?.timeIntervalSince1970 ?? 0
     }
 
     @MainActor
-    func perform() async throws -> some IntentResult {
+    public func perform() async throws -> some IntentResult {
         try DoseActivityMutations.apply(
             status: .skipped,
             medicineIDString: medicineID,
@@ -91,11 +90,10 @@ struct SkipDoseIntent: LiveActivityIntent {
 
 // MARK: - Shared mutation
 
-/// Dose mutation helper local to the widget extension. Mirrors the app-target
-/// `DoseActions` logic but operates on the shared store without depending on
-/// app-only code.
+/// Dose mutation helper. Mirrors the app-target `DoseActions` logic but operates
+/// on the shared store without depending on app-only code.
 @MainActor
-enum DoseActivityMutations {
+public enum DoseActivityMutations {
 
     enum MutationError: LocalizedError {
         case invalidMedicineID

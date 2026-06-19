@@ -10,8 +10,8 @@
 //   • Dynamic Island expanded — title, countdown, and per-medicine rows with
 //     Take/Skip App Intent buttons.
 //
-//  Take/Skip use `TakeDoseIntent` / `SkipDoseIntent` (LiveActivityIntent) so
-//  tapping updates the shared store in-process.
+//  Take/Skip use `TakeDoseActivityIntent` / `SkipDoseActivityIntent`
+//  (LiveActivityIntent, defined in Shared so the app target can execute them).
 //
 
 import ActivityKit
@@ -65,7 +65,7 @@ struct DoseLiveActivity: Widget {
                     .foregroundStyle(leadColor(context.state).color)
                     .accessibilityLabel("Doses")
             } compactTrailing: {
-                CompactTrailing(attributes: context.attributes, state: context.state)
+                CompactTrailing(state: context.state)
             } minimal: {
                 MinimalView(state: context.state)
             }
@@ -78,19 +78,15 @@ struct DoseLiveActivity: Widget {
 
     @ViewBuilder
     private func expandedLeading(_ state: DoseActivityAttributes.ContentState) -> some View {
-        let lead = leadItem(state)
-        HStack(spacing: Spacing.sm) {
-            PillIcon(systemName: lead?.iconName ?? "pills.fill",
-                     color: leadColor(state), size: 30)
-            VStack(alignment: .leading, spacing: 0) {
-                Text("\(state.takenCount)/\(state.totalCount)")
-                    .font(AppFont.headline)
-                    .monospacedDigit()
-                Text("taken")
-                    .font(AppFont.caption2)
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Text("\(state.takenCount)/\(state.totalCount)")
+                .font(AppFont.headline)
+                .monospacedDigit()
+            Text("taken")
+                .font(AppFont.caption2)
+                .foregroundStyle(.secondary)
         }
+        .padding(.leading, Spacing.sm)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Progress")
         .accessibilityValue("\(state.takenCount) of \(state.totalCount) taken")
@@ -99,27 +95,18 @@ struct DoseLiveActivity: Widget {
     @ViewBuilder
     private func expandedTrailing(_ attributes: DoseActivityAttributes,
                                   _ state: DoseActivityAttributes.ContentState) -> some View {
-        VStack(alignment: .trailing, spacing: 0) {
-            if attributes.slotTime > Date() {
-                Text(attributes.slotTime, style: .timer)
-                    .font(AppFont.title3)
-                    .monospacedDigit()
-                    .multilineTextAlignment(.trailing)
-                    .frame(maxWidth: 78, alignment: .trailing)
-            } else {
-                Text("Due now")
-                    .font(AppFont.subheadline)
-                    .foregroundStyle(leadColor(state).color)
-            }
+        VStack(alignment: .trailing, spacing: 2) {
             Text(attributes.slotTime, style: .time)
+                .font(AppFont.title3)
+                .monospacedDigit()
+            Text(attributes.slotTime > Date() ? "scheduled" : "due now")
                 .font(AppFont.caption2)
                 .foregroundStyle(.secondary)
         }
+        .padding(.trailing, Spacing.sm)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Due")
-        .accessibilityValue(attributes.slotTime > Date()
-                            ? attributes.slotTime.formatted(.relative(presentation: .named))
-                            : "now")
+        .accessibilityLabel("Scheduled")
+        .accessibilityValue(attributes.slotTime.formatted(date: .omitted, time: .shortened))
     }
 
     private func leadItem(_ state: DoseActivityAttributes.ContentState) -> DoseActivityAttributes.ContentState.Item? {
@@ -153,7 +140,8 @@ struct DoseLiveActivityLockScreenView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(Spacing.lg)
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.lg)
     }
 
     private var header: some View {
@@ -168,26 +156,16 @@ struct DoseLiveActivityLockScreenView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
-                if attributes.slotTime > Date() {
-                    Text(attributes.slotTime, style: .timer)
-                        .font(AppFont.title3)
-                        .monospacedDigit()
-                        .multilineTextAlignment(.trailing)
-                        .frame(maxWidth: 90, alignment: .trailing)
-                } else {
-                    Text("Due now")
-                        .font(AppFont.subheadline)
-                        .foregroundStyle(.primary)
-                }
                 Text(attributes.slotTime, style: .time)
+                    .font(AppFont.title3)
+                    .monospacedDigit()
+                Text(attributes.slotTime > Date() ? "scheduled" : "due now")
                     .font(AppFont.caption2)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Due")
-            .accessibilityValue(attributes.slotTime > Date()
-                                ? attributes.slotTime.formatted(.relative(presentation: .named))
-                                : "now")
+            .accessibilityLabel("Scheduled")
+            .accessibilityValue(attributes.slotTime.formatted(date: .omitted, time: .shortened))
         }
     }
 }
@@ -256,19 +234,19 @@ private struct MedicineActionRow: View {
     @ViewBuilder
     private func actionButtons(medicineID: UUID) -> some View {
         HStack(spacing: Spacing.sm) {
-            Button(intent: SkipDoseIntent(medicineID: medicineID, scheduledTime: slotTime)) {
-                Image(systemName: "xmark")
+            Button(intent: SkipDoseActivityIntent(medicineID: medicineID, scheduledTime: slotTime)) {
+                Image(systemName: "forward.fill")
                     .font(.system(size: compact ? 13 : 15, weight: .bold))
-                    .frame(width: compact ? 30 : 36, height: compact ? 30 : 36)
+                    .frame(width: compact ? 32 : 38, height: compact ? 32 : 38)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.bordered)
             .tint(.orange)
             .accessibilityLabel("Skip \(item.name)")
 
-            Button(intent: TakeDoseIntent(medicineID: medicineID, scheduledTime: slotTime)) {
+            Button(intent: TakeDoseActivityIntent(medicineID: medicineID, scheduledTime: slotTime)) {
                 Image(systemName: "checkmark")
                     .font(.system(size: compact ? 13 : 15, weight: .bold))
-                    .frame(width: compact ? 30 : 36, height: compact ? 30 : 36)
+                    .frame(width: compact ? 32 : 38, height: compact ? 32 : 38)
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
@@ -288,24 +266,14 @@ private struct MedicineActionRow: View {
 // MARK: - Dynamic Island compact / minimal helpers
 
 private struct CompactTrailing: View {
-    let attributes: DoseActivityAttributes
     let state: DoseActivityAttributes.ContentState
 
     var body: some View {
-        HStack(spacing: 2) {
-            Text("\(state.takenCount)/\(state.totalCount)")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-            if attributes.slotTime > Date() {
-                Text(attributes.slotTime, style: .timer)
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .frame(maxWidth: 44)
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Doses")
-        .accessibilityValue("\(state.takenCount) of \(state.totalCount) taken")
+        Text("\(state.takenCount)/\(state.totalCount)")
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+            .accessibilityLabel("Doses")
+            .accessibilityValue("\(state.takenCount) of \(state.totalCount) taken")
     }
 }
 
