@@ -37,7 +37,7 @@ targets:
       - target: MedicineReminderWidgets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.stefanlaux.medicinereminder.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.stefanlaux.medicinereminder
         PRODUCT_NAME: MedicineReminder
         INFOPLIST_KEY_CFBundleDisplayName: "Med Reminder"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
