@@ -1,31 +1,53 @@
 import ActivityKit
 import Foundation
 
-/// Manages the Dynamic Island / Lock Screen Live Activity that tracks the
-/// progress of the current dose slot. Maps `DoseEvent` -> `DoseActivityAttributes`.
+/// Drives the Dynamic Island / Lock Screen Live Activity for the current dose.
 ///
-/// `Activity` is not `Sendable`. Calling its async `update`/`end` methods from a
-/// `@MainActor` context would *send* the non-Sendable handle across the actor
-/// boundary ("sending 'activity' risks causing data races"). So every ActivityKit
-/// call lives in a `nonisolated` helper that resolves the handle locally from
-/// `Activity.activities`, uses it, and discards it — the `Activity` is never
-/// passed between the main actor and nonisolated code. The `@MainActor` surface
-/// only ever moves `Sendable` values (ids, content state, dates).
+/// Design: there is at most ONE running activity at a time — for the soonest dose
+/// today that still has a pending item. It is (re)started whenever the app is
+/// foregrounded or data changes, counts down to the slot time, shows per-medicine
+/// Take/Skip, and is dismissed as soon as the dose is resolved (taken, skipped,
+/// or snoozed). Notifications are not used.
+///
+/// `Activity` is not `Sendable`, so every ActivityKit call lives in a
+/// `nonisolated` helper that resolves the handle locally from `Activity.activities`
+/// — the non-Sendable handle never crosses an isolation boundary.
 @MainActor
 public final class LiveActivityService {
 
     public static let shared = LiveActivityService()
 
-    /// Pending auto-dismiss tasks keyed by slot id. `Task` is Sendable, so this
-    /// is safe to hold in main-actor state.
+    /// Pending auto-dismiss tasks keyed by slot id (`Task` is Sendable).
     private var dismissTasks: [String: Task<Void, Never>] = [:]
 
-    /// How long after the slot time an unacted activity is auto-dismissed.
+    /// How long after the slot time an unacted activity auto-dismisses.
     private let window: TimeInterval = 2 * 60 * 60
 
     private init() {}
 
     // MARK: Public surface (main actor)
+
+    /// Reconcile Live Activities with today's events: keep exactly one running
+    /// activity — for the soonest dose that still has a pending item — and end
+    /// every other or already-resolved activity. Call on launch, when the app
+    /// becomes active, and after any dose mutation.
+    public func sync(events: [DoseEvent]) async {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        let now = Date()
+        let active = events
+            .filter { event in
+                event.items.contains { $0.status == .pending }
+                    && event.time.addingTimeInterval(window) > now
+            }
+            .min(by: { $0.time < $1.time })
+
+        // Clear out everything that is no longer the active dose.
+        await Self.endActivitiesExcept(keepEventID: active?.id)
+
+        if let active {
+            await startOrUpdate(for: active, title: title(for: active))
+        }
+    }
 
     /// Start a Live Activity for the given dose event, or update it if one is
     /// already running for that slot. No-op if Live Activities are disabled.
@@ -50,15 +72,12 @@ public final class LiveActivityService {
     public func update(for event: DoseEvent) async {
         guard Self.hasActivity(eventID: event.id) else { return }
         let state = Self.contentState(from: event)
-        await Self.updateActivity(
-            eventID: event.id,
-            state: state,
-            staleDate: event.time.addingTimeInterval(window)
-        )
+        await Self.updateActivity(eventID: event.id, state: state, staleDate: event.time.addingTimeInterval(window))
 
-        // Once every item is resolved (nothing pending), retire the activity;
-        // otherwise make sure an auto-dismiss is armed.
-        if state.takenCount + skippedCount(in: event) >= state.totalCount, state.totalCount > 0 {
+        // Retire the activity once nothing in the slot is still pending (taken,
+        // skipped, or snoozed all count as resolved); otherwise keep an
+        // auto-dismiss armed for when the dose window passes.
+        if !event.items.contains(where: { $0.status == .pending }) {
             await end(eventID: event.id)
         } else {
             scheduleAutoDismiss(for: event)
@@ -71,7 +90,7 @@ public final class LiveActivityService {
         await Self.endActivityImmediately(eventID: eventID)
     }
 
-    /// End every running dose activity (e.g. on data reset).
+    /// End every running dose activity.
     public func endAll() async {
         for task in dismissTasks.values { task.cancel() }
         dismissTasks.removeAll()
@@ -81,12 +100,10 @@ public final class LiveActivityService {
     // MARK: ActivityKit calls (nonisolated — the non-Sendable Activity never
     // crosses an isolation boundary because it is resolved and used right here)
 
-    /// Whether the system currently has an activity for this slot id.
     private nonisolated static func hasActivity(eventID: String) -> Bool {
         Activity<DoseActivityAttributes>.activities.contains { $0.attributes.eventID == eventID }
     }
 
-    /// Request a new activity. Returns whether it started.
     private nonisolated static func requestActivity(
         attributes: DoseActivityAttributes,
         state: DoseActivityAttributes.ContentState,
@@ -97,12 +114,10 @@ public final class LiveActivityService {
             _ = try Activity.request(attributes: attributes, content: content, pushType: nil)
             return true
         } catch {
-            // Starting a Live Activity can fail (budget, disabled). Fail quietly.
             return false
         }
     }
 
-    /// Push new content to the activity for this slot, if one exists.
     private nonisolated static func updateActivity(
         eventID: String,
         state: DoseActivityAttributes.ContentState,
@@ -132,10 +147,16 @@ public final class LiveActivityService {
         }
     }
 
+    /// End every running dose activity except the one for `keepEventID`.
+    private nonisolated static func endActivitiesExcept(keepEventID: String?) async {
+        for activity in Activity<DoseActivityAttributes>.activities
+        where activity.attributes.eventID != keepEventID {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
     // MARK: Auto-dismiss
 
-    /// Arm (or re-arm) a task that ends a still-unresolved activity once its dose
-    /// window passes. Replaces any prior task for the same slot.
     private func scheduleAutoDismiss(for event: DoseEvent) {
         let eventID = event.id
         let dismissDate = event.time.addingTimeInterval(window)
@@ -164,10 +185,16 @@ public final class LiveActivityService {
         dismissTasks[eventID] = nil
     }
 
-    // MARK: Helpers
+    // MARK: Mapping
 
-    private func skippedCount(in event: DoseEvent) -> Int {
-        event.items.filter { $0.status == .skipped }.count
+    private func title(for event: DoseEvent) -> String {
+        let hour = Calendar.current.component(.hour, from: event.time)
+        switch hour {
+        case 5..<12: return String(localized: "Morning dose")
+        case 12..<17: return String(localized: "Afternoon dose")
+        case 17..<22: return String(localized: "Evening dose")
+        default: return String(localized: "Night dose")
+        }
     }
 
     /// Build the ActivityKit content state from a dose event.

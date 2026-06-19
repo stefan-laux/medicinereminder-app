@@ -8,6 +8,7 @@ import SwiftUI
 struct MedicineReminderApp: App {
 
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
 
     /// The shared, App-Group-backed container used by the app and widget extension.
     private let container = SharedModelContainer.shared
@@ -24,19 +25,12 @@ struct MedicineReminderApp: App {
         WindowGroup {
             RootView()
                 .environment(doseManager)
-                .task {
-                    await bootstrap()
+                .onChange(of: scenePhase) { _, phase in
+                    // Notifications are not used. Reconcile the Live Activity and
+                    // refresh widgets whenever the app comes to the foreground.
+                    if phase == .active { doseManager.reload() }
                 }
         }
         .modelContainer(container)
-    }
-
-    /// One-time launch work: register notification categories, request authorization,
-    /// and schedule the initial batch of reminders.
-    @MainActor
-    private func bootstrap() async {
-        NotificationService.shared.registerCategories()
-        _ = await NotificationService.shared.requestAuthorization()
-        await NotificationService.shared.rescheduleAll(medicines: doseManager.medicines)
     }
 }

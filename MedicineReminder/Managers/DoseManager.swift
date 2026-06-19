@@ -1,11 +1,15 @@
 import Foundation
 import Observation
 import SwiftData
+import WidgetKit
 
 /// The app's primary observable store. Owns the working set of medicines and
-/// today's grouped dose events, and centralizes the side effects that must run
-/// after a dose mutation: persistence, notification rescheduling, Live Activity
-/// updates, and haptics.
+/// today's grouped dose events, and centralizes the side effects that run after
+/// a dose mutation: persistence, widget refresh, Live Activity reconciliation,
+/// and haptics.
+///
+/// Notifications are intentionally not used — reminders surface only via the
+/// Live Activity (see ``LiveActivityService``).
 @MainActor
 @Observable
 public final class DoseManager {
@@ -29,7 +33,8 @@ public final class DoseManager {
 
     // MARK: Loading
 
-    /// Re-fetch medicines + logs and recompute derived state.
+    /// Re-fetch medicines + logs, recompute derived state, and refresh the
+    /// widgets + Live Activity.
     public func reload() {
         let activeMedicines = fetchMedicines()
         let logs = fetchLogs()
@@ -38,6 +43,8 @@ public final class DoseManager {
         todaysEvents = ScheduleEngine.events(for: activeMedicines, logs: logs, on: Date(), calendar: calendar)
         currentStreak = StreakCalculator.currentStreak(medicines: activeMedicines, logs: logs, asOf: Date(), calendar: calendar)
         longestStreak = StreakCalculator.longestStreak(medicines: activeMedicines, logs: logs, asOf: Date(), calendar: calendar)
+
+        syncExternal()
     }
 
     // MARK: Dose mutations
@@ -53,13 +60,11 @@ public final class DoseManager {
                 in: context
             )
         }
-        // Celebrate a brand-new streak milestone, otherwise a plain success.
         if currentStreak > previousStreak, currentStreak > 0, currentStreak % 7 == 0 {
             HapticEngine.milestone()
         } else {
             HapticEngine.taken()
         }
-        refreshSideEffects()
     }
 
     public func skip(_ item: DoseEventItem) {
@@ -72,7 +77,6 @@ public final class DoseManager {
             )
         }
         HapticEngine.skipped()
-        refreshSideEffects()
     }
 
     public func snooze(_ item: DoseEventItem) {
@@ -80,13 +84,12 @@ public final class DoseManager {
             try DoseActions.snooze(
                 medicineID: item.medicineID,
                 scheduledTime: scheduledTime(for: item),
-                minutes: NotificationIDs.snoozeMinutes,
+                minutes: defaultSnoozeMinutes,
                 source: .manual,
                 in: context
             )
         }
         HapticEngine.selection()
-        refreshSideEffects()
     }
 
     // MARK: Medicine lifecycle
@@ -96,24 +99,17 @@ public final class DoseManager {
         save()
         reload()
         HapticEngine.added()
-        Task { await NotificationService.shared.rescheduleAll(medicines: medicines) }
     }
 
     public func update(_ medicine: Medicine) {
         save()
         reload()
-        Task { await NotificationService.shared.rescheduleAll(medicines: medicines) }
     }
 
     public func archive(_ medicine: Medicine) {
         medicine.isArchived = true
-        let archivedID = medicine.id
         save()
         reload()
-        Task {
-            await NotificationService.shared.cancel(for: archivedID)
-            await NotificationService.shared.rescheduleAll(medicines: medicines)
-        }
     }
 
     // MARK: Private — fetching
@@ -133,7 +129,18 @@ public final class DoseManager {
         return (try? context.fetch(descriptor)) ?? []
     }
 
-    // MARK: Private — side effects
+    // MARK: Private — external sync (widgets + Live Activity)
+
+    /// Reload home/lock widgets and reconcile the Live Activity from freshly
+    /// computed state. Called at the end of every `reload()`.
+    private func syncExternal() {
+        WidgetCenter.shared.reloadAllTimelines()
+        let events = todaysEvents
+        Task { await LiveActivityService.shared.sync(events: events) }
+    }
+
+    /// Default snooze interval (minutes), shared with the App Intents layer.
+    private var defaultSnoozeMinutes: Int { NotificationIDs.snoozeMinutes }
 
     /// Run a throwing mutation then reload derived state. Swallows errors so a
     /// failed mutation never crashes the UI; the next reload reflects reality.
@@ -146,37 +153,7 @@ public final class DoseManager {
         reload()
     }
 
-    private func refreshSideEffects() {
-        let events = todaysEvents
-        Task {
-            await NotificationService.shared.rescheduleAll(medicines: medicines)
-            await updateLiveActivity(events: events)
-        }
-    }
-
-    /// Drive the Live Activity for the currently-relevant dose slot.
-    private func updateLiveActivity(events: [DoseEvent]) async {
-        // The "current" event is the soonest one today that still has pending items.
-        let current = events.first { event in
-            event.items.contains { $0.status == .pending || $0.status == .snoozed }
-        }
-        if let current {
-            await LiveActivityService.shared.startOrUpdate(for: current, title: title(for: current))
-        }
-    }
-
-    private func title(for event: DoseEvent) -> String {
-        let hour = calendar.component(.hour, from: event.time)
-        switch hour {
-        case 5..<12: return String(localized: "Morning dose")
-        case 12..<17: return String(localized: "Afternoon dose")
-        case 17..<22: return String(localized: "Evening dose")
-        default: return String(localized: "Night dose")
-        }
-    }
-
     private func scheduledTime(for item: DoseEventItem) -> Date? {
-        // Find the slot time of the event this item belongs to.
         for event in todaysEvents where event.items.contains(where: { $0.id == item.id }) {
             return event.time
         }

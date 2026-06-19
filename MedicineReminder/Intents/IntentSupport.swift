@@ -1,6 +1,7 @@
 import AppIntents
 import Foundation
 import SwiftData
+import WidgetKit
 
 /// Shared, file-local helpers for the App Intents layer.
 ///
@@ -65,17 +66,16 @@ enum IntentSupport {
 
     // MARK: Side effects (run after a mutation)
 
-    /// Refresh scheduled notifications and the Live Activity from freshly mutated
-    /// data — the same reconciliation the notification action handler performs.
+    /// Refresh the widgets and reconcile the Live Activity from freshly mutated
+    /// data. Notifications are not used.
     @MainActor
     static func refreshAfterMutation() async {
         let medicines = (try? activeMedicines()) ?? []
         let logs = (try? allLogs()) ?? []
+        let events = ScheduleEngine.events(for: medicines, logs: logs, on: Date())
 
-        await NotificationService.shared.rescheduleAll(medicines: medicines)
-        if let next = ScheduleEngine.nextEvent(for: medicines, logs: logs, after: Date()) {
-            await LiveActivityService.shared.update(for: next)
-        }
+        WidgetCenter.shared.reloadAllTimelines()
+        await LiveActivityService.shared.sync(events: events)
     }
 
     // MARK: Spoken formatting

@@ -12,6 +12,7 @@
 //  slot, set its status, save). All SwiftData work is on the @MainActor.
 //
 
+import ActivityKit
 import AppIntents
 import Foundation
 import SwiftData
@@ -49,6 +50,7 @@ struct TakeDoseIntent: LiveActivityIntent {
             scheduledEpoch: scheduledEpoch
         )
         WidgetCenter.shared.reloadAllTimelines()
+        await DoseActivityMutations.reconcileActivity(slotEpoch: scheduledEpoch)
         return .result()
     }
 }
@@ -82,6 +84,7 @@ struct SkipDoseIntent: LiveActivityIntent {
             scheduledEpoch: scheduledEpoch
         )
         WidgetCenter.shared.reloadAllTimelines()
+        await DoseActivityMutations.reconcileActivity(slotEpoch: scheduledEpoch)
         return .result()
     }
 }
@@ -127,6 +130,35 @@ enum DoseActivityMutations {
         log.sourceRaw = LogSource.liveActivity.rawValue
         log.snoozedUntil = nil
         try context.save()
+    }
+
+    /// After a Take/Skip from the Live Activity, end the slot's activity once
+    /// nothing in it is still pending. (Content for any remaining medicines in
+    /// the slot is reconciled when the app next becomes active.)
+    static func reconcileActivity(slotEpoch: Double) async {
+        guard slotEpoch != 0 else { return }
+        let day = Date(timeIntervalSince1970: slotEpoch)
+        let slotID = ScheduleEngine.slotID(day)
+        let context = SharedModelContainer.shared.mainContext
+        let medicines = (try? context.fetch(
+            FetchDescriptor<Medicine>(predicate: #Predicate { !$0.isArchived })
+        )) ?? []
+        let logs = (try? context.fetch(FetchDescriptor<DoseLog>())) ?? []
+        let events = ScheduleEngine.events(for: medicines, logs: logs, on: day)
+        let stillPending = events.first { $0.id == slotID }?
+            .items.contains { $0.status == .pending } ?? false
+        if !stillPending {
+            await endActivity(slotID: slotID)
+        }
+    }
+
+    /// End any Live Activity for the given slot id. Nonisolated so the
+    /// non-Sendable `Activity` handle never crosses an isolation boundary.
+    private nonisolated static func endActivity(slotID: String) async {
+        for activity in Activity<DoseActivityAttributes>.activities
+        where activity.attributes.eventID == slotID {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 
     /// Locate the existing log for this medicine + slot (matched within a
