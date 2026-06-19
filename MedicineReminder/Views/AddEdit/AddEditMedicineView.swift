@@ -9,9 +9,7 @@
 //
 //  Features
 //  --------
-//  • FDA brand-name autocomplete on the name field (debounced async call to
-//    `FDAService.search`, graceful offline fallback, suggestion list, applies a
-//    "Custom" `TagBadge` when the entry is free-text with no FDA match).
+//  • Free-text medicine name.
 //  • Dosage amount (decimals gated by `DosageUnit.allowsDecimal`), unit picker,
 //    `ColorChip` palette grid, SF Symbol icon picker, notes.
 //  • A schedule builder driven by `ScheduleFrequencyType` with conditional UI:
@@ -50,9 +48,6 @@ public struct AddEditMedicineView: View {
     // MARK: Identity fields
 
     @State private var name: String = ""
-    @State private var fdaGenericName: String? = nil
-    /// `true` when the entry is free-text with no confirmed FDA match.
-    @State private var isCustom: Bool = true
 
     // MARK: Dosage fields
 
@@ -77,14 +72,6 @@ public struct AddEditMedicineView: View {
     @State private var startDate: Date = Calendar.current.startOfDay(for: Date())
     @State private var hasEndDate: Bool = false
     @State private var endDate: Date = Calendar.current.startOfDay(for: Date()).addingTimeInterval(60 * 60 * 24 * 30)
-
-    // MARK: FDA autocomplete state
-
-    @State private var suggestions: [FDADrug] = []
-    @State private var isSearching: Bool = false
-    @State private var showSuggestions: Bool = false
-    /// The text the running search task is debouncing/serving.
-    @State private var searchQuery: String = ""
 
     // MARK: Animation
 
@@ -124,7 +111,6 @@ public struct AddEditMedicineView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
             .onAppear(perform: loadIfNeeded)
-            .task(id: searchQuery) { await runSearch(for: searchQuery) }
         }
     }
 
@@ -132,95 +118,20 @@ public struct AddEditMedicineView: View {
 
     @ViewBuilder
     private var identitySection: some View {
-        Section {
+        Section("Medicine") {
             HStack(spacing: Spacing.md) {
                 PillIcon(systemName: iconName, color: color, size: 52)
                     .scaleEffect(pillScale)
 
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    TextField("Medicine name", text: $name)
-                        .font(AppFont.headline)
-                        .textInputAutocapitalization(.words)
-                        .autocorrectionDisabled()
-                        .submitLabel(.done)
-                        .accessibilityLabel("Medicine name")
-                        .onChange(of: name, handleNameChange)
-
-                    HStack(spacing: Spacing.sm) {
-                        if isCustom {
-                            TagBadge.custom
-                        } else {
-                            TagBadge("FDA", systemImage: "checkmark.seal.fill", tint: MedicineColor.emerald.color)
-                        }
-                        if isSearching {
-                            ProgressView()
-                                .controlSize(.mini)
-                                .accessibilityLabel("Searching")
-                        }
-                    }
-                    .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: isCustom)
-                }
+                TextField("Medicine name", text: $name)
+                    .font(AppFont.headline)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .accessibilityLabel("Medicine name")
             }
             .padding(.vertical, Spacing.xs)
-
-            if showSuggestions && !suggestions.isEmpty {
-                ForEach(suggestions) { drug in
-                    suggestionRow(drug)
-                }
-            }
-        } header: {
-            Text("Medicine")
-        } footer: {
-            if isCustom && !trimmedName.isEmpty {
-                Text("No FDA match — this will be saved as a custom medicine.")
-            } else if !isCustom, let generic = fdaGenericName, !generic.isEmpty {
-                Text("Generic name: \(generic)")
-            }
         }
-    }
-
-    private func suggestionRow(_ drug: FDADrug) -> some View {
-        Button {
-            applySuggestion(drug)
-        } label: {
-            HStack(spacing: Spacing.md) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(MedicineColor.emerald.color)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(drug.brandName)
-                        .font(AppFont.subheadline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    if let generic = drug.genericName, !generic.isEmpty {
-                        Text(generic)
-                            .font(AppFont.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: Spacing.sm)
-                Image(systemName: "arrow.up.left")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityHidden(true)
-            }
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(suggestionAccessibilityLabel(drug))
-        .accessibilityHint("Uses this FDA medicine name.")
-    }
-
-    /// Spoken label for an FDA suggestion row (kept out of string interpolation
-    /// to keep the view's type-checking cheap).
-    private func suggestionAccessibilityLabel(_ drug: FDADrug) -> String {
-        if let generic = drug.genericName, !generic.isEmpty {
-            return "\(drug.brandName), \(generic)"
-        }
-        return drug.brandName
     }
 
     // MARK: - Dosage section
@@ -376,7 +287,7 @@ public struct AddEditMedicineView: View {
 
     @ViewBuilder
     private var timeSlotEditor: some View {
-        ForEach(Array(timeSlots.enumerated()), id: \.element.id) { index, slot in
+        ForEach(Array(timeSlots.enumerated()), id: \.offset) { index, slot in
             DatePicker(
                 "Dose \(index + 1)",
                 selection: bindingForSlot(at: index),
@@ -586,8 +497,6 @@ public struct AddEditMedicineView: View {
         defer { DispatchQueue.main.async { isLoading = false } }
 
         name = medicine.name
-        fdaGenericName = medicine.fdaGenericName
-        isCustom = medicine.isCustom
         dosageText = formatLoadedAmount(medicine.dosageAmount)
         unit = medicine.unit
         color = medicine.color
@@ -619,63 +528,6 @@ public struct AddEditMedicineView: View {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
             pillScale = 1
         }
-    }
-
-    // MARK: - Name change + FDA search driving
-
-    private func handleNameChange(_ oldValue: String, _ newValue: String) {
-        // Don't disturb FDA/custom state while populating from an existing medicine.
-        guard !isLoading else { return }
-        // Typing free-text marks the entry custom until a suggestion is chosen.
-        isCustom = true
-        fdaGenericName = nil
-        showSuggestions = true
-        searchQuery = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Debounced FDA search. Re-run automatically by `.task(id: searchQuery)`
-    /// whenever the query changes; the sleep provides the debounce and is
-    /// cancelled when the id changes again.
-    private func runSearch(for query: String) async {
-        guard query.count >= 2 else {
-            suggestions = []
-            isSearching = false
-            return
-        }
-
-        // Debounce: wait a beat; if the query changes, this task is cancelled.
-        do {
-            try await Task.sleep(for: .milliseconds(350))
-        } catch {
-            return
-        }
-        guard !Task.isCancelled else { return }
-
-        isSearching = true
-        let results = await FDAService.shared.search(query)
-        guard !Task.isCancelled else { return }
-
-        isSearching = false
-        suggestions = results
-
-        // Auto-confirm an exact brand-name match so the badge flips to FDA.
-        if let exact = results.first(where: { $0.brandName.compare(query, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }) {
-            isCustom = false
-            fdaGenericName = exact.genericName
-        }
-    }
-
-    private func applySuggestion(_ drug: FDADrug) {
-        name = drug.brandName
-        fdaGenericName = drug.genericName
-        isCustom = false
-        showSuggestions = false
-        suggestions = []
-        searchQuery = drug.brandName
-        if !reduceMotion {
-            animatePillIn()
-        }
-        HapticEngine.selection()
     }
 
     // MARK: - Field mutations
@@ -777,8 +629,8 @@ public struct AddEditMedicineView: View {
             medicine.colorRaw = color.rawValue
             medicine.iconName = iconName
             medicine.notes = notes
-            medicine.isCustom = isCustom
-            medicine.fdaGenericName = isCustom ? nil : fdaGenericName
+            medicine.isCustom = true
+            medicine.fdaGenericName = nil
 
             applySchedule(schedule, to: medicine)
             manager.update(medicine)
@@ -790,8 +642,8 @@ public struct AddEditMedicineView: View {
                 color: color,
                 iconName: iconName,
                 notes: notes,
-                isCustom: isCustom,
-                fdaGenericName: isCustom ? nil : fdaGenericName,
+                isCustom: true,
+                fdaGenericName: nil,
                 sortIndex: manager.medicines.count
             )
             schedule.medicine = medicine
