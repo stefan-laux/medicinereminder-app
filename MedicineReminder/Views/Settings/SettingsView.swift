@@ -13,6 +13,7 @@
 //
 
 import AppIntents
+import AudioToolbox
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -61,6 +62,16 @@ fileprivate enum NotificationSoundChoice: String, CaseIterable, Identifiable {
         case .gentle: "bell.badge.waveform"
         case .chime: "bell.and.waves.left.and.right.fill"
         case .alert: "bell.badge.fill"
+        }
+    }
+
+    /// System sound played once as a preview when the user picks this option.
+    var previewSoundID: SystemSoundID {
+        switch self {
+        case .default: 1007
+        case .gentle: 1003
+        case .chime: 1013
+        case .alert: 1005
         }
     }
 }
@@ -174,6 +185,9 @@ struct SettingsView: View {
             }
             .accessibilityLabel(Text("Reminder sound"))
             .accessibilityValue(Text(notificationSoundEnabled ? "On" : "Off"))
+            .onChange(of: notificationSoundEnabled) { _, enabled in
+                if enabled { playSoundPreview(selectedSound) }
+            }
 
             if notificationSoundEnabled {
                 Picker(selection: $notificationSoundRaw) {
@@ -191,6 +205,9 @@ struct SettingsView: View {
                 }
                 .accessibilityLabel(Text("Notification sound"))
                 .accessibilityValue(Text(selectedSound.displayName))
+                .onChange(of: notificationSoundRaw) { _, newValue in
+                    playSoundPreview(NotificationSoundChoice(rawValue: newValue) ?? .default)
+                }
             }
         } header: {
             Text("Reminders")
@@ -276,16 +293,12 @@ struct SettingsView: View {
                     .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
                                               bottom: Spacing.sm, trailing: Spacing.lg))
 
-                Label {
-                    Text("Edit phrases and add these to the Home Screen in the Shortcuts app.")
-                        .font(AppFont.footnote)
-                        .foregroundStyle(.secondary)
-                } icon: {
-                    Image(systemName: "app.connected.to.app.below.fill")
-                        .foregroundStyle(MedicineColor.indigo.color)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text("Manage these shortcuts in the Shortcuts app"))
+                // Tappable — opens the Shortcuts app to add/run these shortcuts.
+                ShortcutsLink()
+                    .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg,
+                                              bottom: Spacing.sm, trailing: Spacing.lg))
+                    .accessibilityLabel(Text("Open in Shortcuts"))
+                    .accessibilityHint(Text("Opens the Shortcuts app to add or run these shortcuts"))
             }
         } header: {
             Text("Siri & Shortcuts")
@@ -366,6 +379,12 @@ struct SettingsView: View {
         let medicines = (try? modelContext.fetch(FetchDescriptor<Medicine>())) ?? []
         let logs = (try? modelContext.fetch(FetchDescriptor<DoseLog>())) ?? []
         exportDocument = CSVDocument(text: ExportService.csv(medicines: medicines, logs: logs))
+    }
+
+    /// Play the chosen reminder sound once so the user can preview it.
+    private func playSoundPreview(_ sound: NotificationSoundChoice) {
+        guard notificationSoundEnabled else { return }
+        AudioServicesPlaySystemSound(sound.previewSoundID)
     }
 }
 

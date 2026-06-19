@@ -2,49 +2,41 @@
 //  DoseEventCard.swift
 //  MedicineReminder
 //
-//  A Liquid Glass card representing one dose slot (a `DoseEvent`): a rounded
-//  slot-time header followed by one row per medicine due at that time. Each
-//  row offers per-medicine Take / Skip / Snooze, tinted by the medicine's
-//  color, with:
-//    • Take  → success haptic + a green fill that radiates from the tap point
-//    • Skip  → warning haptic + dimmed, struck-through styling
-//    • Swipe right = Take (green), swipe left = Skip (orange)
-//  All large animations are gated behind Reduce Motion. Mutations route
-//  through `DoseManager.markTaken/skip/snooze`.
+//  A Liquid Glass card for one dose slot (a `DoseEvent`): a slot-time header
+//  followed by one row per medicine due at that time. Every card uses the same
+//  neutral glass background; the medicine's chosen color is used only for its
+//  pill icon. Taking a dose flashes the WHOLE card green; skipping dims + strikes
+//  through the row. Swipe right = Take, swipe left = Skip. Mutations route through
+//  `DoseManager`.
 //
 
 import SwiftUI
 
 /// A card for a single dose slot. Hand it the slot's ``DoseEvent`` and the
-/// shared ``DoseManager``; it renders a header and a row per medicine and
-/// performs the logging actions itself.
-///
-/// ```swift
-/// DoseEventCard(event: event, manager: doseManager)
-/// ```
+/// shared ``DoseManager``.
 public struct DoseEventCard: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let event: DoseEvent
     private let manager: DoseManager
 
-    /// - Parameters:
-    ///   - event: The dose slot to render.
-    ///   - manager: The shared dose store that performs the mutations.
+    /// 0 = none, 1 = full green wash. Pulsed on take so the whole card flashes.
+    @State private var takeFlash: CGFloat = 0
+
     public init(event: DoseEvent, manager: DoseManager) {
         self.event = event
         self.manager = manager
     }
 
     public var body: some View {
-        GlassCard(tint: tint) {
+        GlassCard {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 header
 
                 VStack(spacing: Spacing.sm) {
                     ForEach(event.items) { item in
                         DoseItemRow(item: item,
-                                    onTake: { manager.markTaken(item, amount: nil) },
+                                    onTake: { handleTake(item) },
                                     onSkip: { manager.skip(item) },
                                     onSnooze: { manager.snooze(item) })
                         if item.id != event.items.last?.id {
@@ -54,13 +46,21 @@ public struct DoseEventCard: View {
                 }
             }
         }
+        .overlay {
+            // Whole-card green flash when a dose is taken.
+            RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                .fill(Color.green.opacity(0.24 * takeFlash))
+                .allowsHitTesting(false)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
     }
 
-    private var tint: Color? {
-        // Tint the card with the first medicine's color, softly.
-        guard let first = event.items.first,
-              let color = MedicineColor(rawValue: first.colorRaw) else { return nil }
-        return color.color
+    /// Log the dose and flash the entire card green.
+    private func handleTake(_ item: DoseEventItem) {
+        manager.markTaken(item, amount: nil)
+        guard !reduceMotion else { return }
+        takeFlash = 1
+        withAnimation(.easeOut(duration: 0.55)) { takeFlash = 0 }
     }
 
     private var header: some View {
@@ -110,8 +110,8 @@ public struct DoseEventCard: View {
 
 // MARK: - Single medicine row within the card
 
-/// One medicine within a ``DoseEventCard``. Owns its own transient animation
-/// state (radiating fill on take) and gesture handling. File-private.
+/// One medicine within a ``DoseEventCard``. Owns its swipe state; the green
+/// take animation is handled by the card. File-private.
 private struct DoseItemRow: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -120,15 +120,8 @@ private struct DoseItemRow: View {
     let onSkip: () -> Void
     let onSnooze: () -> Void
 
-    /// Tap point (in this row's local space) from which the green fill radiates.
-    @State private var fillOrigin: CGPoint?
-    /// Drives the radiating-circle mask from 0 → 1.
-    @State private var fillProgress: CGFloat = 0
     /// Horizontal swipe offset for the take/skip swipe affordance.
     @State private var dragOffset: CGFloat = 0
-    /// Center of the Take button (in the row's coordinate space) so the fill
-    /// radiates from the control the user pressed.
-    @State private var takeButtonCenter: CGPoint = .zero
 
     private var isTaken: Bool { item.status == .taken }
     private var isSkipped: Bool { item.status == .skipped }
@@ -139,25 +132,19 @@ private struct DoseItemRow: View {
         ZStack {
             swipeBackground
             rowContent
-                .background(takeFillOverlay)
                 .offset(x: dragOffset)
                 .gesture(swipeGesture)
         }
-        .coordinateSpace(.named(rowSpace))
         .clipShape(.rect(cornerRadius: Radius.md))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(item.status.label)
         .accessibilityActions {
-            Button("Take") { performTake(from: nil) }
+            Button("Take") { onTake() }
             Button("Skip") { performSkip() }
-            Button("Snooze") { performSnooze() }
+            Button("Snooze") { onSnooze() }
         }
     }
-
-    /// Named coordinate space so the Take button can report its center for the
-    /// radiating fill origin.
-    private var rowSpace: String { "doseRow-\(item.id.uuidString)" }
 
     // MARK: Row content
 
@@ -202,6 +189,7 @@ private struct DoseItemRow: View {
         .contentShape(.rect)
     }
 
+    /// The medicine's accent color — used only for its pill icon.
     private var medicineColor: MedicineColor {
         MedicineColor(rawValue: item.colorRaw) ?? .default
     }
@@ -210,58 +198,17 @@ private struct DoseItemRow: View {
     private var controls: some View {
         HStack(spacing: Spacing.sm) {
             DoseStatusButton(.take, tint: .green, isActive: isTaken) {
-                performTake(from: takeButtonCenter == .zero ? nil : takeButtonCenter)
+                onTake()
             }
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .onAppear { updateTakeCenter(proxy) }
-                        .onChange(of: proxy.size) { _, _ in updateTakeCenter(proxy) }
-                }
-            }
-
             DoseStatusButton(.skip, tint: .orange, isActive: isSkipped) {
                 performSkip()
             }
             if !isResolved {
                 DoseStatusButton(.snooze, isActive: isSnoozed) {
-                    performSnooze()
+                    onSnooze()
                 }
             }
         }
-    }
-
-    private func updateTakeCenter(_ proxy: GeometryProxy) {
-        let frame = proxy.frame(in: .named(rowSpace))
-        takeButtonCenter = CGPoint(x: frame.midX, y: frame.midY)
-    }
-
-    // MARK: Radiating green take-fill
-
-    /// A green circle that grows from `fillOrigin`, clipped to the row, when
-    /// the dose is taken. Suppressed under Reduce Motion.
-    @ViewBuilder
-    private var takeFillOverlay: some View {
-        GeometryReader { proxy in
-            if let origin = fillOrigin, !reduceMotion {
-                let maxRadius = maxFillRadius(in: proxy.size, from: origin)
-                Circle()
-                    .fill(Color.green.opacity(0.22))
-                    .frame(width: maxRadius * 2, height: maxRadius * 2)
-                    .scaleEffect(fillProgress)
-                    .position(origin)
-            } else if isTaken {
-                // Reduce Motion / persisted-taken: a calm static green wash.
-                Color.green.opacity(0.12)
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    private func maxFillRadius(in size: CGSize, from origin: CGPoint) -> CGFloat {
-        let dx = max(origin.x, size.width - origin.x)
-        let dy = max(origin.y, size.height - origin.y)
-        return (dx * dx + dy * dy).squareRoot()
     }
 
     // MARK: Swipe affordance
@@ -271,7 +218,7 @@ private struct DoseItemRow: View {
             swipeBadge(symbol: "checkmark", tint: .green)
                 .opacity(dragOffset > 0 ? swipeOpacity : 0)
             Spacer()
-            swipeBadge(symbol: "xmark", tint: .orange)
+            swipeBadge(symbol: "forward.fill", tint: .orange)
                 .opacity(dragOffset < 0 ? swipeOpacity : 0)
         }
         .padding(.horizontal, Spacing.md)
@@ -294,7 +241,6 @@ private struct DoseItemRow: View {
         DragGesture(minimumDistance: 14)
             .onChanged { value in
                 guard !isResolved else { return }
-                // Horizontal-dominant drags only; clamp the visual travel.
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
                 let clamped = max(-120, min(120, value.translation.width))
                 if reduceMotion {
@@ -309,7 +255,7 @@ private struct DoseItemRow: View {
                 guard !isResolved else { resetDrag(); return }
                 let width = value.translation.width
                 if width >= swipeCommitThreshold {
-                    performTake(from: nil)
+                    onTake()
                 } else if width <= -swipeCommitThreshold {
                     performSkip()
                 }
@@ -325,42 +271,12 @@ private struct DoseItemRow: View {
         }
     }
 
-    // MARK: Actions
-
-    private func performTake(from point: CGPoint?) {
-        // Haptics are owned by `DoseManager.markTaken` (which also handles the
-        // streak-milestone haptic), so the row only drives the visual fill.
-        if reduceMotion {
-            onTake()
-        } else {
-            // Radiate from the supplied point, else from the Take button's
-            // measured center as a sensible fallback.
-            fillOrigin = point ?? (takeButtonCenter == .zero ? nil : takeButtonCenter)
-            fillProgress = 0
-            withAnimation(.easeOut(duration: 0.45)) {
-                fillProgress = 1
-            }
-            onTake()
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(500))
-                fillProgress = 0
-                fillOrigin = nil
-            }
-        }
-    }
-
     private func performSkip() {
-        // Haptics owned by `DoseManager.skip`.
         if reduceMotion {
             onSkip()
         } else {
             withAnimation(.snappy(duration: 0.3)) { onSkip() }
         }
-    }
-
-    private func performSnooze() {
-        // Haptics owned by `DoseManager.snooze`.
-        onSnooze()
     }
 
     private var accessibilityLabel: String {
